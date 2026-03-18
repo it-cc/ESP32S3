@@ -1,31 +1,40 @@
 #include <Arduino.h>
+#include <WiFi.h>
 
-#include "../include/Ov5640Camera.h"
+#include "OV5640_base.h"
+#include "esp_camera.h"
+#include "esp_http_server.h"
+#include "esp_log.h"
+#include "jpg_http_capture.h"
 
-ov5640::Ov5640Camera g_camera;
+static const char *MAIN_TAG = "main";
 
 void setup()
 {
-  Serial.begin(2000000);
-  delay(200);
+  Serial.begin(115200);
+  delay(1000);
 
-  if (!g_camera.init())
+  // 初始化文件系统
+  if (!LittleFS.begin(true))
   {
-    while (true) delay(1000);
+    Serial.println("LittleFS Mount Failed");
+    return;
   }
 
-  Serial.println("READY: send 'C' to capture one JPEG frame");
+  // 初始化摄像头
+  camera_init();
+
+  // 建立 WiFi 热点 (AP)
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("ESP32S3-CAM", "12345678");
+  Serial.print("AP 启动, IP地址: ");
+  Serial.println(WiFi.softAPIP());
 }
 
 void loop()
 {
-  if (Serial.available() > 0)
-  {
-    const int cmd = Serial.read();
-    if (cmd == 'C' || cmd == 'c')
-    {
-      g_camera.run();
-    }
-  }
-  delay(2);
+  // 每隔10秒拍一张照片
+  Serial.println("拍摄一张新照片...");
+  camera_capture();
+  delay(10000);
 }
