@@ -12,10 +12,12 @@ const char* ssid = "Redmi";
 const char* password = "88889999";
 
 static CameraService g_camera;
-static MemoryPhotoStore g_photoStore(6);
+static MemoryPhotoStore g_photoStore(10);
 static PhotoWebServer g_photoWeb(g_photoStore);
 static WifiService g_wifi;
 static const uint32_t CAPTURE_INTERVAL_MS = 1000;
+static const uint32_t WEB_TASK_STACK = 8192;
+static const uint32_t CAPTURE_TASK_STACK = 163840;
 
 static void webTask(void* pvParameters)
 {
@@ -83,10 +85,10 @@ void setup()
     return;
   }
 
-  BaseType_t webOk =
-      xTaskCreatePinnedToCore(webTask, "WebTask", 4096, NULL, 2, NULL, 0);
-  BaseType_t capOk = xTaskCreatePinnedToCore(captureTask, "CaptureTask", 4096,
-                                             NULL, 1, NULL, 1);
+  BaseType_t webOk = xTaskCreatePinnedToCore(webTask, "WebTask", WEB_TASK_STACK,
+                                             NULL, 2, NULL, 0);
+  BaseType_t capOk = xTaskCreatePinnedToCore(
+      captureTask, "CaptureTask", CAPTURE_TASK_STACK, NULL, 1, NULL, 1);
 
   if (webOk != pdPASS || capOk != pdPASS)
   {
@@ -97,5 +99,5 @@ void setup()
 void loop()
 {
   // 避免空转占满 CPU，保证系统任务调度稳定
-  vTaskDelay(pdMS_TO_TICKS(1000));
+  vTaskDelay(pdMS_TO_TICKS(3000));
 }

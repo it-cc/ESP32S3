@@ -23,6 +23,19 @@
 
 static const char* CAMERA_TAG = "CameraService";
 
+static bool isLikelyValidJpegFrame(const camera_fb_t* fb)
+{
+  if (fb == NULL || fb->buf == NULL || fb->len < 4)
+  {
+    return false;
+  }
+
+  const uint8_t* data = fb->buf;
+  size_t len = fb->len;
+  return data[0] == 0xFF && data[1] == 0xD8 && data[len - 2] == 0xFF &&
+         data[len - 1] == 0xD9;
+}
+
 CameraService::CameraService()
 {
   config_.pin_pwdn = CAM_PIN_PWDN;
@@ -43,14 +56,14 @@ CameraService::CameraService()
   config_.pin_href = CAM_PIN_HREF;
   config_.pin_pclk = CAM_PIN_PCLK;
 
-  config_.xclk_freq_hz = 10000000;
+  config_.xclk_freq_hz = 20000000;
   config_.ledc_timer = LEDC_TIMER_0;
   config_.ledc_channel = LEDC_CHANNEL_0;
 
   config_.pixel_format = PIXFORMAT_JPEG;
-  config_.frame_size = FRAMESIZE_QVGA;
-  config_.jpeg_quality = 12;
-  config_.fb_count = 1;
+  config_.frame_size = FRAMESIZE_SXGA;
+  config_.jpeg_quality = 10;
+  config_.fb_count = 2;
   config_.grab_mode = CAMERA_GRAB_LATEST;
 }
 
@@ -119,6 +132,14 @@ esp_err_t CameraService::captureToJpegBuffer(uint8_t** outBuf, size_t* outLen,
       esp_camera_fb_return(fb);
       result = ESP_FAIL;
       break;
+    }
+
+    if (!isLikelyValidJpegFrame(fb))
+    {
+      ESP_LOGW(CAMERA_TAG, "Invalid JPEG markers, attempt %d/3", attempt + 1);
+      esp_camera_fb_return(fb);
+      vTaskDelay(pdMS_TO_TICKS(50 * (attempt + 1)));
+      continue;
     }
 
     uint8_t* copied = (uint8_t*)malloc(fb->len);
