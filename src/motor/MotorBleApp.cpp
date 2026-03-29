@@ -13,6 +13,7 @@ namespace motor_app
 #define LED_PIN 2
 #define FALL_THRESHOLD 5.0
 #define MPU_TASK_PERIOD_MS 10
+#define BATTERY_TASK_STACK_WORDS 4096
 
 // ========== 振动马达引脚定义 ==========
 #define MOTOR_PIN_1 39
@@ -283,6 +284,14 @@ void batteryTask(void* pvParameters)
 
   while (true)
   {
+    UBaseType_t stackWordsLeft = uxTaskGetStackHighWaterMark(NULL);
+    if (stackWordsLeft < 512)
+    {
+      LOG_PRINTF(LOG_BATTERY,
+                 "[Battery Task] 警告: 剩余栈仅 %u words, 可能接近溢出\n",
+                 (unsigned)stackWordsLeft);
+    }
+
     int battery = random(1, 101);
 
     if (battery != lastBattery)
@@ -486,8 +495,8 @@ bool startTasksImpl()
 
   xTaskCreatePinnedToCore(bleTask, "BLE_Task", 4096, NULL, 1, &bleTaskHandle,
                           0);
-  xTaskCreatePinnedToCore(batteryTask, "Battery_Task", 2048, NULL, 1,
-                          &batteryTaskHandle, 0);
+  xTaskCreatePinnedToCore(batteryTask, "Battery_Task", BATTERY_TASK_STACK_WORDS,
+                          NULL, 1, &batteryTaskHandle, 0);
   xTaskCreatePinnedToCore(wifiTask, "WiFi+Motor_Task", 4096, NULL, 1,
                           &wifiTaskHandle, 0);
 
