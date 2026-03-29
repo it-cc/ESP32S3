@@ -64,13 +64,16 @@ CameraService::CameraService()
 
   config_.pixel_format = PIXFORMAT_JPEG;
   config_.frame_size = FRAMESIZE_VGA;
-  config_.jpeg_quality = 7;
+  config_.jpeg_quality = 10;
   config_.fb_count = 2;
+
   config_.grab_mode = CAMERA_GRAB_LATEST;
 }
 
 esp_err_t CameraService::begin()
 {
+  LOG_PRINTF(LOG_CAMERA, "[Camera] psramFound=%d\n", psramFound() ? 1 : 0);
+
   if (CAM_PIN_PWDN != -1)
   {
     pinMode(CAM_PIN_PWDN, OUTPUT);

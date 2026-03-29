@@ -23,11 +23,11 @@
 #endif
 
 #ifndef LOG_MOTOR
-#define LOG_MOTOR 0
+#define LOG_MOTOR 1
 #endif
 
 #ifndef LOG_ULTRASONIC
-#define LOG_ULTRASONIC 1
+#define LOG_ULTRASONIC 0
 #endif
 
 #define LOG_PRINT(enabled, msg)     \

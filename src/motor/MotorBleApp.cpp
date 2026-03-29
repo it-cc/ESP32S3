@@ -11,7 +11,8 @@ namespace motor_app
 {
 // ========== 硬件引脚定义 ==========
 #define LED_PIN 2
-#define FALL_THRESHOLD 3.0
+#define FALL_THRESHOLD 5.0
+#define MPU_TASK_PERIOD_MS 10
 
 // ========== 振动马达引脚定义 ==========
 #define MOTOR_PIN_1 39
@@ -49,6 +50,8 @@ TaskHandle_t wifiTaskHandle = NULL;
 QueueHandle_t mpuDataQueue = NULL;
 QueueHandle_t bleMessageQueue = NULL;
 bool s_motorInitialized = false;
+bool s_mpuReady = false;
+volatile float s_fallThresholdG2 = FALL_THRESHOLD;
 
 typedef struct
 {
@@ -117,7 +120,16 @@ void bleDataCallback(String data)
     LOG_PRINTLN(LOG_BLE, "[BLE] 命令: 设置跌倒阈值");
     String valStr = data.substring(14);
     float newThreshold = valStr.toFloat();
-    LOG_PRINTF(LOG_BLE, "[BLE] 新阈值: %.2f g²\n", newThreshold);
+    if (newThreshold >= 0.5f && newThreshold <= 20.0f)
+    {
+      s_fallThresholdG2 = newThreshold;
+      LOG_PRINTF(LOG_BLE, "[BLE] 新阈值已生效: %.2f g²\n", s_fallThresholdG2);
+    }
+    else
+    {
+      LOG_PRINTF(LOG_BLE, "[BLE] 阈值无效(%.2f), 允许范围: 0.5~20.0 g²\n",
+                 newThreshold);
+    }
   }
   else if (data.startsWith("WIFI:"))
   {
@@ -190,7 +202,7 @@ void mpuTask(void* pvParameters)
     mpu.getMotion6(&sensorData.ax, &sensorData.ay, &sensorData.az,
                    &sensorData.gx, &sensorData.gy, &sensorData.gz);
 
-    bool isFalling = mpu.checkFall(FALL_THRESHOLD);
+    bool isFalling = mpu.checkFall(s_fallThresholdG2);
     unsigned long now = millis();
 
     if (isFalling && !fallFlag && (now - fallCooldown > 3000))
@@ -222,7 +234,7 @@ void mpuTask(void* pvParameters)
       LOG_PRINTLN(LOG_MPU, "[MPU] 警告: 队列已满,数据丢弃");
     }
 
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(MPU_TASK_PERIOD_MS));
   }
 }
 
@@ -407,12 +419,6 @@ bool initImpl()
 {
   randomSeed((uint32_t)esp_random());
 
-  LOG_PRINTLN(LOG_BLE, "\n\n");
-  LOG_PRINTLN(LOG_BLE, "==========================================");
-  LOG_PRINTLN(LOG_BLE, "  ESP32-S3 MPU6050 + BLE + FreeRTOS");
-  LOG_PRINTLN(LOG_BLE, "  低功耗蓝牙版本");
-  LOG_PRINTLN(LOG_BLE, "==========================================");
-
   LOG_PRINTLN(LOG_BLE, "[Setup] 初始化LED引脚...");
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
@@ -440,10 +446,12 @@ bool initImpl()
     LOG_PRINTLN(LOG_MPU, "[Setup] 请检查I2C连接 (SDA=GPIO21, SCL=GPIO20)");
     LOG_PRINTLN(LOG_MPU,
                 "[Setup] 进入降级模式: 跳过MPU相关能力,继续启动其他模块");
+    s_mpuReady = false;
   }
   else
   {
     LOG_PRINTLN(LOG_MPU, "[Setup] MPU6050初始化成功!");
+    s_mpuReady = true;
   }
 
   LOG_PRINTLN(LOG_BLE, "[Setup] 初始化低功耗蓝牙...");
@@ -464,6 +472,17 @@ bool startTasksImpl()
   }
 
   LOG_PRINTLN(LOG_BLE, "[Setup] 创建FreeRTOS任务...");
+
+  if (s_mpuReady)
+  {
+    xTaskCreatePinnedToCore(mpuTask, "MPU_Task", 4096, NULL, 2, &mpuTaskHandle,
+                            1);
+    LOG_PRINTLN(LOG_MPU, "[Setup] MPU任务已创建(Core 1)");
+  }
+  else
+  {
+    LOG_PRINTLN(LOG_MPU, "[Setup] MPU未就绪, 跳过MPU任务创建");
+  }
 
   xTaskCreatePinnedToCore(bleTask, "BLE_Task", 4096, NULL, 1, &bleTaskHandle,
                           0);

@@ -13,6 +13,13 @@ static const uint32_t ULTRASONIC_TASK_STACK = 4096;
 static const uint32_t ECHO_TIMEOUT_US = 12000;  // ~2m, 减少阻塞避免看门狗压力
 static const uint32_t SAMPLE_INTERVAL_MS = 100;
 
+static bool isReservedBySpiMemory(uint8_t pin)
+{
+  // ESP32-S3 的 GPIO26~GPIO37 连接 SPI0/1，常用于外部 Flash/PSRAM。
+  // 这些引脚被重配为普通 GPIO 时，可能直接破坏堆并触发 LoadProhibited。
+  return pin >= 26 && pin <= 37;
+}
+
 void begin(uint8_t trigPin, uint8_t echoPin)
 {
   s_trigPin = trigPin;
@@ -30,6 +37,23 @@ void begin(uint8_t trigPin, uint8_t echoPin)
 
 bool initUltrasonicModule(uint8_t trigPin, uint8_t echoPin)
 {
+  if (isReservedBySpiMemory(trigPin) || isReservedBySpiMemory(echoPin))
+  {
+    LOG_PRINTF(LOG_ULTRASONIC,
+               "[Ultrasonic] invalid pins: trig=%u echo=%u; "
+               "GPIO26~37 are reserved for SPI flash/PSRAM on ESP32-S3\n",
+               trigPin, echoPin);
+    return false;
+  }
+
+  if (trigPin == echoPin)
+  {
+    LOG_PRINTF(LOG_ULTRASONIC,
+               "[Ultrasonic] invalid pins: trig and echo must differ (%u)\n",
+               trigPin);
+    return false;
+  }
+
   begin(trigPin, echoPin);
   return true;
 }

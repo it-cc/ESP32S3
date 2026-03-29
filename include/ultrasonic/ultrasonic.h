@@ -4,11 +4,11 @@
 #include <Arduino.h>
 
 #ifndef ULTRASONIC_TRIG_PIN
-#define ULTRASONIC_TRIG_PIN 35
+#define ULTRASONIC_TRIG_PIN 47
 #endif
 
 #ifndef ULTRASONIC_ECHO_PIN
-#define ULTRASONIC_ECHO_PIN 36
+#define ULTRASONIC_ECHO_PIN 48
 #endif
 
 namespace ultrasonic
