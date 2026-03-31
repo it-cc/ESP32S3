@@ -163,9 +163,6 @@ void bleDataCallback(String data)
     String angleStr = data.substring(7);
     int angle = angleStr.toInt();
 
-    if (angle < -180) angle = -180;
-    if (angle > 180) angle = 180;
-
     LOG_PRINTF(LOG_BLE, "[BLE] 目标角度: %d\n", angle);
 
     MotorCommand cmd;
@@ -282,6 +279,8 @@ void batteryTask(void* pvParameters)
 
   LOG_PRINTLN(LOG_BATTERY, "[Battery Task] 任务已启动, 运行在 Core 0");
 
+  int battery = random(81, 101);
+
   while (true)
   {
     UBaseType_t stackWordsLeft = uxTaskGetStackHighWaterMark(NULL);
@@ -292,8 +291,6 @@ void batteryTask(void* pvParameters)
                  (unsigned)stackWordsLeft);
     }
 
-    int battery = random(1, 101);
-
     if (battery != lastBattery)
     {
       LOG_PRINTF(LOG_BATTERY, "[Battery Task] 电量变化: %d%%\n", battery);
@@ -302,10 +299,9 @@ void batteryTask(void* pvParameters)
     }
     else
     {
-      LOG_PRINTF(LOG_BATTERY, "[Battery Task] 电量未变化: %d%%\n", battery);
+      int time = random(1, 5);
+      vTaskDelay(pdMS_TO_TICKS(time * 100 * 60));
     }
-
-    vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
