@@ -1,13 +1,13 @@
-#include "ble/BleApp.h"
+#include "ble/BleModule.h"
 
 #include <Arduino.h>
 
 #include "LogSwitch.h"
-#include "motor/MotorBleApp.h"
+#include "motor/MotorModule.h"
 #include "motor/ble_mpu.h"
 #include "motor/mpu_sensor.h"
 
-namespace ble
+namespace esp32s3
 {
 #define LED_PIN 2
 #define FALL_THRESHOLD 5.0
@@ -70,12 +70,12 @@ void bleDataCallback(String data)
     int angle = angleStr.toInt();
 
     LOG_PRINTF(LOG_BLE, "[BLE] 目标角度: %d\n", angle);
-    (void)motorStartByAngle(angle);
+    (void)esp32s3::MotorModule::startByAngle(angle);
   }
   else if (data.equals("end"))
   {
     LOG_PRINTLN(LOG_BLE, "[BLE] 命令: 结束振动");
-    (void)motorStop();
+    (void)esp32s3::MotorModule::stop();
   }
   else if (s_externalHandler != nullptr && s_externalHandler(data))
   {
@@ -207,7 +207,7 @@ void batteryTask(void* pvParameters)
   }
 }
 
-bool initImpl()
+static bool initImpl()
 {
   randomSeed((uint32_t)esp_random());
 
@@ -248,7 +248,7 @@ bool initImpl()
   return true;
 }
 
-bool startTasksImpl()
+static bool startTasksImpl()
 {
   if (!s_initialized)
   {
@@ -277,14 +277,18 @@ bool startTasksImpl()
   LOG_PRINTLN(LOG_BLE, "[Setup] BLE模块启动完成!");
   return true;
 }
-}  // namespace ble
+}  // namespace esp32s3
 
-bool initBleApp() { return ble::initImpl(); }
-bool startBleTasks() { return ble::startTasksImpl(); }
+bool esp32s3::BleModule::init() { return esp32s3::initImpl(); }
+bool esp32s3::BleModule::startTasks() { return esp32s3::startTasksImpl(); }
 
-void bleSendMessage(const String& message) { ble::ble.sendMessage(message); }
-
-void bleRegisterExternalCommandHandler(BleExternalCommandHandler handler)
+void esp32s3::BleModule::sendMessage(const String& message)
 {
-  ble::s_externalHandler = handler;
+  esp32s3::ble.sendMessage(message);
+}
+
+void esp32s3::BleModule::registerExternalCommandHandler(
+    BleExternalCommandHandler handler)
+{
+  esp32s3::s_externalHandler = handler;
 }

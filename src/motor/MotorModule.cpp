@@ -1,10 +1,10 @@
-#include "motor/MotorBleApp.h"
+#include "motor/MotorModule.h"
 
 #include <Arduino.h>
 
 #include "LogSwitch.h"
 
-namespace motor
+namespace esp32s3
 {
 #define MOTOR_PIN_1 39
 #define MOTOR_PIN_2 40
@@ -144,7 +144,7 @@ bool enqueueMotorCmd(MotorCmdType cmd, int angle)
   return xQueueSend(motorCmdQueue, &motorCmd, 0) == pdPASS;
 }
 
-bool initImpl()
+static bool initImpl()
 {
   randomSeed((uint32_t)esp_random());
 
@@ -163,7 +163,7 @@ bool initImpl()
   return true;
 }
 
-bool startTasksImpl()
+static bool startTasksImpl()
 {
   if (!s_motorInitialized)
   {
@@ -182,14 +182,17 @@ bool startTasksImpl()
   LOG_PRINTLN(LOG_MOTOR, "[Setup] Motor模块启动完成!");
   return true;
 }
-}  // namespace motor
+}  // namespace esp32s3
 
-bool initMotorBleApp() { return motor::initImpl(); }
-bool startMotorBleTasks() { return motor::startTasksImpl(); }
+bool esp32s3::MotorModule::init() { return esp32s3::initImpl(); }
+bool esp32s3::MotorModule::startTasks() { return esp32s3::startTasksImpl(); }
 
-bool motorStartByAngle(int angle)
+bool esp32s3::MotorModule::startByAngle(int angle)
 {
-  return motor::enqueueMotorCmd(motor::MOTOR_CMD_START, angle);
+  return esp32s3::enqueueMotorCmd(esp32s3::MOTOR_CMD_START, angle);
 }
 
-bool motorStop() { return motor::enqueueMotorCmd(motor::MOTOR_CMD_STOP, 0); }
+bool esp32s3::MotorModule::stop()
+{
+  return esp32s3::enqueueMotorCmd(esp32s3::MOTOR_CMD_STOP, 0);
+}

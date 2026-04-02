@@ -11,16 +11,20 @@
 #define ULTRASONIC_ECHO_PIN 48
 #endif
 
-namespace ultrasonic
+namespace esp32s3
 {
-bool initUltrasonicModule(uint8_t trigPin = ULTRASONIC_TRIG_PIN,
-                          uint8_t echoPin = ULTRASONIC_ECHO_PIN);
-bool startUltrasonicTask();
-void begin(uint8_t trigPin = ULTRASONIC_TRIG_PIN,
-           uint8_t echoPin = ULTRASONIC_ECHO_PIN);
-float measureDistanceMm();
-float getLatestDistanceMm();
-void task(void* pvParameters);
-}  // namespace ultrasonic
+class UltrasonicModule
+{
+ public:
+  static bool init(uint8_t trigPin = ULTRASONIC_TRIG_PIN,
+                   uint8_t echoPin = ULTRASONIC_ECHO_PIN);
+  static bool startTask();
+  static void begin(uint8_t trigPin = ULTRASONIC_TRIG_PIN,
+                    uint8_t echoPin = ULTRASONIC_ECHO_PIN);
+  static float measureDistanceMm();
+  static float getLatestDistanceMm();
+  static void task(void* pvParameters);
+};
+}  // namespace esp32s3
 
 #endif

@@ -1,4 +1,4 @@
-#include "WIFI/WifiProvisioning.h"
+#include "WIFI/WifiModule.h"
 
 #include <WiFi.h>
 
@@ -8,7 +8,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
-namespace wifi_internal
+namespace esp32s3
 {
 struct WiFiConfig
 {
@@ -143,18 +143,17 @@ void wifiTask(void* pvParameters)
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
-}  // namespace wifi_internal
+}  // namespace esp32s3
 
-bool initWifiProvisioningModule(WifiNotifyCallback notifyCb)
+bool esp32s3::WifiModule::init(WifiNotifyCallback notifyCb)
 {
-  wifi_internal::s_notify = notifyCb;
-  if (wifi_internal::s_wifiConfigQueue == NULL)
+  esp32s3::s_notify = notifyCb;
+  if (esp32s3::s_wifiConfigQueue == NULL)
   {
-    wifi_internal::s_wifiConfigQueue =
-        xQueueCreate(2, sizeof(wifi_internal::WiFiConfig));
+    esp32s3::s_wifiConfigQueue = xQueueCreate(2, sizeof(esp32s3::WiFiConfig));
   }
 
-  if (wifi_internal::s_wifiConfigQueue == NULL)
+  if (esp32s3::s_wifiConfigQueue == NULL)
   {
     LOG_PRINTLN(LOG_WIFI, "[WiFi Task] 错误: WiFi配置队列创建失败");
     return false;
@@ -163,23 +162,23 @@ bool initWifiProvisioningModule(WifiNotifyCallback notifyCb)
   return true;
 }
 
-bool startWifiProvisioningTask(UBaseType_t priority, BaseType_t core,
-                               uint32_t stackWords)
+bool esp32s3::WifiModule::startTask(UBaseType_t priority, BaseType_t core,
+                                    uint32_t stackWords)
 {
-  if (wifi_internal::s_wifiTaskHandle != NULL)
+  if (esp32s3::s_wifiTaskHandle != NULL)
   {
     return true;
   }
 
-  BaseType_t ok = xTaskCreatePinnedToCore(
-      wifi_internal::wifiTask, "WiFi_Task", stackWords, NULL, priority,
-      &wifi_internal::s_wifiTaskHandle, core);
+  BaseType_t ok =
+      xTaskCreatePinnedToCore(esp32s3::wifiTask, "WiFi_Task", stackWords, NULL,
+                              priority, &esp32s3::s_wifiTaskHandle, core);
   return ok == pdPASS;
 }
 
-bool handleWifiBleCommand(const String& data)
+bool esp32s3::WifiModule::handleBleCommand(const String& data)
 {
-  if (wifi_internal::s_wifiConfigQueue == NULL)
+  if (esp32s3::s_wifiConfigQueue == NULL)
   {
     return false;
   }
@@ -197,11 +196,11 @@ bool handleWifiBleCommand(const String& data)
       LOG_PRINTLN(LOG_BLE, ssid);
       LOG_PRINTLN(LOG_BLE, "[BLE] WiFi Password: ******");
 
-      wifi_internal::WiFiConfig wifiConfig;
+      esp32s3::WiFiConfig wifiConfig;
       wifiConfig.clearOnly = false;
       ssid.toCharArray(wifiConfig.ssid, sizeof(wifiConfig.ssid));
       password.toCharArray(wifiConfig.password, sizeof(wifiConfig.password));
-      xQueueSend(wifi_internal::s_wifiConfigQueue, &wifiConfig, 0);
+      xQueueSend(esp32s3::s_wifiConfigQueue, &wifiConfig, 0);
       return true;
     }
 
@@ -220,43 +219,43 @@ bool handleWifiBleCommand(const String& data)
       String ssid = data.substring(ssidPos + 5, pwdPos);
       String password = data.substring(pwdPos + 5);
 
-      wifi_internal::WiFiConfig wifiConfig;
+      esp32s3::WiFiConfig wifiConfig;
       wifiConfig.clearOnly = false;
       ssid.toCharArray(wifiConfig.ssid, sizeof(wifiConfig.ssid));
       password.toCharArray(wifiConfig.password, sizeof(wifiConfig.password));
-      xQueueSend(wifi_internal::s_wifiConfigQueue, &wifiConfig, 0);
-      wifi_internal::sendNotify("PROV:STATE:CONNECTING");
+      xQueueSend(esp32s3::s_wifiConfigQueue, &wifiConfig, 0);
+      esp32s3::sendNotify("PROV:STATE:CONNECTING");
     }
     else
     {
-      wifi_internal::sendNotify("PROV:ERR:BAD_FORMAT");
+      esp32s3::sendNotify("PROV:ERR:BAD_FORMAT");
     }
     return true;
   }
 
   if (data.equals("PROV:CLEAR"))
   {
-    wifi_internal::WiFiConfig wifiConfig;
+    esp32s3::WiFiConfig wifiConfig;
     wifiConfig.clearOnly = true;
     wifiConfig.ssid[0] = '\0';
     wifiConfig.password[0] = '\0';
-    xQueueSend(wifi_internal::s_wifiConfigQueue, &wifiConfig, 0);
+    xQueueSend(esp32s3::s_wifiConfigQueue, &wifiConfig, 0);
     return true;
   }
 
   if (data.equals("PROV:GET"))
   {
-    if (wifi_internal::s_wifiConnected && WiFi.status() == WL_CONNECTED)
+    if (esp32s3::s_wifiConnected && WiFi.status() == WL_CONNECTED)
     {
-      wifi_internal::sendNotify("PROV:OK:IP=" + WiFi.localIP().toString());
+      esp32s3::sendNotify("PROV:OK:IP=" + WiFi.localIP().toString());
     }
-    else if (wifi_internal::s_store.hasSaved())
+    else if (esp32s3::s_store.hasSaved())
     {
-      wifi_internal::sendNotify("PROV:STATE:SAVED");
+      esp32s3::sendNotify("PROV:STATE:SAVED");
     }
     else
     {
-      wifi_internal::sendNotify("PROV:STATE:IDLE");
+      esp32s3::sendNotify("PROV:STATE:IDLE");
     }
     return true;
   }
@@ -264,7 +263,7 @@ bool handleWifiBleCommand(const String& data)
   return false;
 }
 
-bool isWifiProvisionedConnected()
+bool esp32s3::WifiModule::isConnected()
 {
-  return wifi_internal::s_wifiConnected && WiFi.status() == WL_CONNECTED;
+  return esp32s3::s_wifiConnected && WiFi.status() == WL_CONNECTED;
 }
