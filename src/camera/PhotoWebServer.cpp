@@ -1,5 +1,6 @@
 #include "camera/PhotoWebServer.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,9 +11,15 @@ static const char* WEB_TAG = "PhotoWebServer";
 PhotoWebServer* PhotoWebServer::instance_ = NULL;
 
 PhotoWebServer::PhotoWebServer(MemoryPhotoStore& store)
-    : store_(store), server_(NULL)
+    : store_(store), server_(NULL), userId_(0)
 {
 }
+
+void PhotoWebServer::setUserId(uint32_t userId) { userId_ = userId; }
+
+uint32_t PhotoWebServer::getUserId() const { return userId_; }
+
+uint32_t PhotoWebServer::getCameraId() const { return kCameraId; }
 
 void PhotoWebServer::notifyNewFrame()
 {
@@ -146,10 +153,24 @@ esp_err_t PhotoWebServer::handleWs(httpd_req_t* req)
       return sendLatestFrameToClient(req);
     }
 
+    if (parseAndStoreUserId((const char*)payload))
+    {
+      char ack[64];
+      snprintf(ack, sizeof(ack), "id ok: user=%u camera=%u",
+               (unsigned int)getUserId(), (unsigned int)getCameraId());
+
+      httpd_ws_frame_t textReply;
+      memset(&textReply, 0, sizeof(textReply));
+      textReply.type = HTTPD_WS_TYPE_TEXT;
+      textReply.payload = (uint8_t*)ack;
+      textReply.len = strlen(ack);
+      return httpd_ws_send_frame(req, &textReply);
+    }
+
     httpd_ws_frame_t textReply;
     memset(&textReply, 0, sizeof(textReply));
     textReply.type = HTTPD_WS_TYPE_TEXT;
-    const char* msg = "send: latest";
+    const char* msg = "send: latest or id:<number>";
     textReply.payload = (uint8_t*)msg;
     textReply.len = strlen(msg);
     return httpd_ws_send_frame(req, &textReply);
@@ -186,6 +207,62 @@ bool PhotoWebServer::getLatestFrame(uint8_t** outBuf, size_t* outLen,
   return store_.cloneFrameById(photos[0].id, outBuf, outLen);
 }
 
+bool PhotoWebServer::parseAndStoreUserId(const char* text)
+{
+  if (text == NULL)
+  {
+    return false;
+  }
+  if (strncmp(text, "id:", 3) != 0)
+  {
+    return false;
+  }
+
+  const char* idPart = text + 3;
+  if (*idPart == '\0')
+  {
+    return false;
+  }
+  for (const char* p = idPart; *p != '\0'; ++p)
+  {
+    if (*p < '0' || *p > '9')
+    {
+      return false;
+    }
+  }
+
+  setUserId((uint32_t)strtoul(idPart, NULL, 10));
+  LOG_ESP_I(LOG_CAMERA, WEB_TAG, "Stored user id=%u", (unsigned int)userId_);
+  return true;
+}
+
+bool PhotoWebServer::sendMetaToClient(httpd_req_t* req, uint32_t frameId,
+                                      size_t frameLen)
+{
+  if (req == NULL)
+  {
+    return false;
+  }
+
+  char meta[128];
+  int n = snprintf(meta, sizeof(meta),
+                   "{\"type\":\"meta\",\"userId\":%u,\"cameraId\":%u,"
+                   "\"frameId\":%u,\"len\":%u}",
+                   (unsigned int)getUserId(), (unsigned int)getCameraId(),
+                   (unsigned int)frameId, (unsigned int)frameLen);
+  if (n <= 0)
+  {
+    return false;
+  }
+
+  httpd_ws_frame_t metaFrame;
+  memset(&metaFrame, 0, sizeof(metaFrame));
+  metaFrame.type = HTTPD_WS_TYPE_TEXT;
+  metaFrame.payload = (uint8_t*)meta;
+  metaFrame.len = (size_t)n;
+  return httpd_ws_send_frame(req, &metaFrame) == ESP_OK;
+}
+
 esp_err_t PhotoWebServer::sendLatestFrameToClient(httpd_req_t* req)
 {
   if (req == NULL)
@@ -195,8 +272,15 @@ esp_err_t PhotoWebServer::sendLatestFrameToClient(httpd_req_t* req)
 
   uint8_t* cloned = NULL;
   size_t len = 0;
-  if (!getLatestFrame(&cloned, &len, NULL))
+  uint32_t frameId = 0;
+  if (!getLatestFrame(&cloned, &len, &frameId))
   {
+    return ESP_FAIL;
+  }
+
+  if (!sendMetaToClient(req, frameId, len))
+  {
+    free(cloned);
     return ESP_FAIL;
   }
 
@@ -254,6 +338,29 @@ void PhotoWebServer::broadcastLatestToWsClients()
   {
     int fd = clientFds[i];
     if (httpd_ws_get_fd_info(server_, fd) != HTTPD_WS_CLIENT_WEBSOCKET)
+    {
+      continue;
+    }
+
+    char meta[128];
+    int n = snprintf(meta, sizeof(meta),
+                     "{\"type\":\"meta\",\"userId\":%u,\"cameraId\":%u,"
+                     "\"frameId\":%u,\"len\":%u}",
+                     (unsigned int)getUserId(), (unsigned int)getCameraId(),
+                     (unsigned int)id, (unsigned int)len);
+    if (n > 0)
+    {
+      httpd_ws_frame_t metaFrame;
+      memset(&metaFrame, 0, sizeof(metaFrame));
+      metaFrame.type = HTTPD_WS_TYPE_TEXT;
+      metaFrame.payload = (uint8_t*)meta;
+      metaFrame.len = (size_t)n;
+      if (httpd_ws_send_frame_async(server_, fd, &metaFrame) != ESP_OK)
+      {
+        continue;
+      }
+    }
+    else
     {
       continue;
     }

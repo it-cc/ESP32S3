@@ -8,6 +8,7 @@ class CameraModule
  public:
   static bool init();
   static bool startTasks();
+  static bool handleBleCommand(const String& data);
 };
 }  // namespace esp32s3
 

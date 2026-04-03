@@ -131,3 +131,34 @@ bool esp32s3::CameraModule::startTasks()
 
   return true;
 }
+
+bool esp32s3::CameraModule::handleBleCommand(const String& data)
+{
+  if (!data.startsWith("id:"))
+  {
+    return false;
+  }
+
+  String idStr = data.substring(3);
+  if (idStr.length() == 0)
+  {
+    LOG_PRINTLN(LOG_CAMERA, "[Camera] invalid id command: empty id");
+    return true;
+  }
+
+  for (size_t i = 0; i < idStr.length(); ++i)
+  {
+    char c = idStr.charAt(i);
+    if (c < '0' || c > '9')
+    {
+      LOG_PRINTLN(LOG_CAMERA, "[Camera] invalid id command: non-digit");
+      return true;
+    }
+  }
+
+  uint32_t userId = (uint32_t)idStr.toInt();
+  esp32s3::g_photoWeb.setUserId(userId);
+  LOG_PRINTF(LOG_CAMERA, "[Camera] user id updated via BLE: %u\n",
+             (unsigned int)userId);
+  return true;
+}
