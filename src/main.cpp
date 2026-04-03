@@ -2,8 +2,6 @@
 
 #include "LogSwitch.h"
 #include "app/AppModule.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 void setup()
 {
