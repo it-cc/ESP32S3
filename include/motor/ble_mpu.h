@@ -37,6 +37,10 @@ private:
     String rxBuffer;              // BLE接收缓冲区
     unsigned long lastRxTime;     // 最后一次接收数据的时间
     void processRxBuffer();       // 处理接收缓冲区
+
+    int lastBatteryLevel;         // 记录最后一次电量值
+    unsigned long connectTimeMs;   // 连接时间戳
+    bool firstBatterySent;         // 是否已经发送过第一次电量
 };
 
 class MyServerCallbacks : public BLEServerCallbacks {

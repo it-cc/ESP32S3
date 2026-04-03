@@ -4,11 +4,11 @@
 
 namespace esp32s3
 {
-static uint8_t s_trigPin0= 37;
-static uint8_t s_echoPin0 = 38;
+static uint8_t s_trigPin0= 1;
+static uint8_t s_echoPin0 = 2;
 
-static uint8_t s_trigPin1= 35;
-static uint8_t s_echoPin1 =36;
+static uint8_t s_trigPin1= 3;
+static uint8_t s_echoPin1 =6;
 
 static volatile float s_latestDistanceMm0 = -1.0f;
 static volatile float s_latestDistanceMm1 = -1.0f;
@@ -58,7 +58,7 @@ void UltrasonicModule::begin1(uint8_t trigPin, uint8_t echoPin)
 
 bool UltrasonicModule::init0(uint8_t trigPin, uint8_t echoPin)
 {
-  /*if (isReservedBySpiMemory(trigPin) || isReservedBySpiMemory(echoPin))
+  if (isReservedBySpiMemory(trigPin) || isReservedBySpiMemory(echoPin))
   {
     LOG_PRINTF(LOG_ULTRASONIC,
                "[Ultrasonic] invalid pins: trig=%u echo=%u; "
@@ -66,7 +66,6 @@ bool UltrasonicModule::init0(uint8_t trigPin, uint8_t echoPin)
                trigPin, echoPin);
     return false;
   }
-  */
 
   if (trigPin == echoPin)
   {
@@ -81,8 +80,7 @@ bool UltrasonicModule::init0(uint8_t trigPin, uint8_t echoPin)
 
 bool UltrasonicModule::init1(uint8_t trigPin, uint8_t echoPin)
 {
- /*
- if (isReservedBySpiMemory(trigPin) || isReservedBySpiMemory(echoPin))
+  if (isReservedBySpiMemory(trigPin) || isReservedBySpiMemory(echoPin))
   {
     LOG_PRINTF(LOG_ULTRASONIC,
                "[Ultrasonic] invalid pins: trig=%u echo=%u; "
@@ -90,7 +88,6 @@ bool UltrasonicModule::init1(uint8_t trigPin, uint8_t echoPin)
                trigPin, echoPin);
     return false;
   }
-  */
 
   if (trigPin == echoPin)
   {
