@@ -150,7 +150,13 @@ bool AppModule::boot()
   bool wifiInitOk = WifiModule::init(BootCoordinator::forwardWifiNotifyToBle);
   bool iicInitOk = IicMasterModule::init();
   bool ultrasonicInitOk =
+<<<<<<< HEAD
       UltrasonicModule::init(ULTRASONIC_TRIG_PIN, ULTRASONIC_ECHO_PIN);
+=======
+      UltrasonicModule::init0(ULTRASONIC_TRIG_PIN0, ULTRASONIC_ECHO_PIN0) &&
+      UltrasonicModule::init1(ULTRASONIC_TRIG_PIN1, ULTRASONIC_ECHO_PIN1) ;
+  bool cameraInitOk = CameraModule::init();
+>>>>>>> 1562c15dd05e4abe9d83c82bbb04f670d201c14c
 
   BleModule::registerExternalCommandHandler(
       BootCoordinator::handleWifiBleBridgeCommand);

@@ -32,12 +32,28 @@ namespace
 #define IIC_MASTER_RETRY_COUNT 2
 #endif
 
+#ifndef IIC_MASTER_TXRX_GAP_MS
+#define IIC_MASTER_TXRX_GAP_MS 8
+#endif
+
+#ifndef IIC_MASTER_SECOND_READ_GAP_MS
+#define IIC_MASTER_SECOND_READ_GAP_MS 4
+#endif
+
+#ifndef IIC_MASTER_POST_PROVISION_SUSPEND_MS
+#define IIC_MASTER_POST_PROVISION_SUSPEND_MS 8000
+#endif
+
 #ifndef IIC_MASTER_TASK_STACK_WORDS
 #define IIC_MASTER_TASK_STACK_WORDS 4096
 #endif
 
 #ifndef IIC_MASTER_TASK_PRIORITY
 #define IIC_MASTER_TASK_PRIORITY 1
+#endif
+
+#ifndef IIC_ENABLE_NODE_B
+#define IIC_ENABLE_NODE_B 0
 #endif
 
 static const uint8_t kNodeAddressA = 0x24;
@@ -54,6 +70,7 @@ SemaphoreHandle_t s_busMutex = nullptr;
 TaskHandle_t s_pollTaskHandle = nullptr;
 bool s_initialized = false;
 uint8_t s_nextSeq = 1;
+uint32_t s_pollSuspendUntilMs = 0;
 
 NodeRuntime s_nodes[kNodeCount] = {
     {{kNodeAddressA, false, 0, iic::ERR_OK, 0, 0}},
@@ -156,9 +173,37 @@ static bool readPacket(uint8_t address, uint8_t* outBuf, size_t outBufSize,
     (void)s_iicBus.read();
   }
 
+  if (index < iic::kMinFrameLen)
+  {
+    LOG_PRINTF(LOG_IIC,
+               "[IIC] RX header too short addr=0x%02X index=%u got=%u\n",
+               address, (unsigned int)index, (unsigned int)got);
+    return false;
+  }
+
+  const uint8_t payloadLen = outBuf[3];
+  const size_t expectedLen = (size_t)iic::kMinFrameLen + payloadLen;
+  if (payloadLen > iic::kMaxPayloadLen || expectedLen > outBufSize)
+  {
+    LOG_PRINTF(LOG_IIC,
+               "[IIC] RX invalid header addr=0x%02X payloadLen=%u outBuf=%u\n",
+               address, payloadLen, (unsigned int)outBufSize);
+    return false;
+  }
+
+  if (index < expectedLen)
+  {
+    LOG_PRINTF(LOG_IIC,
+               "[IIC] RX incomplete frame addr=0x%02X expect=%u actual=%u\n",
+               address, (unsigned int)expectedLen, (unsigned int)index);
+    return false;
+  }
+
   if (outLen != nullptr)
   {
-    *outLen = index;
+    // Some Wire implementations may return padded extra bytes when requesting
+    // a larger length than the slave response. Decode only the declared frame.
+    *outLen = expectedLen;
   }
   return true;
 }
@@ -184,39 +229,62 @@ static bool transceive(uint8_t address, uint8_t msgType, const uint8_t* payload,
     }
 
     bool txOk = writePacket(address, txBuf, txLen);
-    delay(2);
+    delay(IIC_MASTER_TXRX_GAP_MS);
 
-    uint8_t rxBuf[iic::kMaxFrameLen] = {0};
-    size_t rxLen = 0;
-    bool rxOk = txOk && readPacket(address, rxBuf, sizeof(rxBuf), &rxLen);
+    bool matched = false;
+    iic::FrameView matchedFrame = {};
+
+    // Slave may return previous frame on the first request right after TX.
+    // Try one extra read before retrying TX to avoid duplicate command writes.
+    for (int readTry = 0; txOk && readTry < 2; ++readTry)
+    {
+      uint8_t rxBuf[iic::kMaxFrameLen] = {0};
+      size_t rxLen = 0;
+      if (!readPacket(address, rxBuf, sizeof(rxBuf), &rxLen))
+      {
+        break;
+      }
+
+      iic::ErrorCode decodeErr = iic::ERR_OK;
+      iic::FrameView frame = {};
+      if (!iic::IicProtocolCodec::decode(rxBuf, rxLen, &frame, &decodeErr))
+      {
+        LOG_PRINTF(LOG_IIC,
+                   "[IIC] decode failed addr=0x%02X err=%u len=%u attempt=%d "
+                   "readTry=%d\n",
+                   address, decodeErr, (unsigned int)rxLen, attempt, readTry);
+        break;
+      }
+
+      if (frame.seq == seq)
+      {
+        matched = true;
+        matchedFrame = frame;
+        break;
+      }
+
+      if (readTry == 0)
+      {
+        delay(IIC_MASTER_SECOND_READ_GAP_MS);
+        continue;
+      }
+
+      LOG_PRINTF(
+          LOG_IIC,
+          "[IIC] seq mismatch addr=0x%02X tx=%u rx=%u attempt=%d readTry=%d\n",
+          address, seq, frame.seq, attempt, readTry);
+    }
+
     xSemaphoreGive(s_busMutex);
 
-    if (!rxOk)
+    if (!matched)
     {
-      continue;
-    }
-
-    iic::ErrorCode decodeErr = iic::ERR_OK;
-    iic::FrameView frame = {};
-    if (!iic::IicProtocolCodec::decode(rxBuf, rxLen, &frame, &decodeErr))
-    {
-      LOG_PRINTF(LOG_IIC,
-                 "[IIC] decode failed addr=0x%02X err=%u len=%u attempt=%d\n",
-                 address, decodeErr, (unsigned int)rxLen, attempt);
-      continue;
-    }
-
-    if (frame.seq != seq)
-    {
-      LOG_PRINTF(LOG_IIC,
-                 "[IIC] seq mismatch addr=0x%02X tx=%u rx=%u attempt=%d\n",
-                 address, seq, frame.seq, attempt);
       continue;
     }
 
     if (outResponse != nullptr)
     {
-      *outResponse = frame;
+      *outResponse = matchedFrame;
     }
     return true;
   }
@@ -292,14 +360,28 @@ static bool requestStatus(uint8_t address)
 
 static void pollTask(void* pvParameters)
 {
+#if IIC_ENABLE_NODE_B
   LOG_PRINTF(LOG_IIC,
              "[IIC] poll task started, nodes=[0x%02X,0x%02X], period=%u ms\n",
              kNodeAddressA, kNodeAddressB, (unsigned int)IIC_MASTER_POLL_MS);
+#else
+  LOG_PRINTF(LOG_IIC, "[IIC] poll task started, nodes=[0x%02X], period=%u ms\n",
+             kNodeAddressA, (unsigned int)IIC_MASTER_POLL_MS);
+#endif
 
   while (true)
   {
+    uint32_t now = millis();
+    if (s_pollSuspendUntilMs != 0 && (int32_t)(s_pollSuspendUntilMs - now) > 0)
+    {
+      vTaskDelay(pdMS_TO_TICKS(50));
+      continue;
+    }
+
     (void)requestStatus(kNodeAddressA);
+#if IIC_ENABLE_NODE_B
     (void)requestStatus(kNodeAddressB);
+#endif
     vTaskDelay(pdMS_TO_TICKS(IIC_MASTER_POLL_MS));
   }
 }
@@ -330,9 +412,38 @@ static bool sendSimpleCommand(uint8_t address, uint8_t msgType)
 static bool sendPayloadCommand(uint8_t address, uint8_t msgType,
                                const uint8_t* payload, uint8_t payloadLen)
 {
+  if (msgType == iic::MSG_SET_WIFI_CONFIG && payload != nullptr &&
+      payloadLen >= 2)
+  {
+    const uint8_t ssidLen = payload[0];
+    const uint8_t pwdLen = payload[1];
+    LOG_PRINTF(
+        LOG_IIC,
+        "[IIC] TX SET_WIFI addr=0x%02X ssidLen=%u pwdLen=%u frameLen=%u\n",
+        address, ssidLen, pwdLen, payloadLen);
+  }
+
+  if (msgType == iic::MSG_SET_WS_CONFIG && payload != nullptr &&
+      payloadLen >= 5)
+  {
+    const uint8_t hostLen = payload[0];
+    const uint8_t pathLen = payload[1];
+    const uint16_t port =
+        (uint16_t)((uint16_t)payload[2] | ((uint16_t)payload[3] << 8));
+    const uint8_t useTls = payload[4];
+    LOG_PRINTF(LOG_IIC,
+               "[IIC] TX SET_WS addr=0x%02X hostLen=%u pathLen=%u port=%u "
+               "tls=%u frameLen=%u\n",
+               address, hostLen, pathLen, (unsigned int)port, useTls,
+               payloadLen);
+  }
+
   iic::FrameView response = {};
   if (!transceive(address, msgType, payload, payloadLen, &response))
   {
+    LOG_PRINTF(LOG_IIC,
+               "[IIC] TX cmd fail addr=0x%02X msg=0x%02X payloadLen=%u\n",
+               address, msgType, payloadLen);
     return false;
   }
 
@@ -347,6 +458,12 @@ static bool sendPayloadCommand(uint8_t address, uint8_t msgType,
   {
     node->status.lastError = response.payload[0];
   }
+
+  LOG_PRINTF(
+      LOG_IIC,
+      "[IIC] RX ACK addr=0x%02X msg=0x%02X seq=%u payloadLen=%u err=%u\n",
+      address, response.msgType, response.seq,
+      (unsigned int)response.payloadLen, node->status.lastError);
 
   return node->status.lastError == iic::ERR_OK;
 }
@@ -441,6 +558,37 @@ static bool startTasksImpl()
 bool IicMasterModule::init() { return initImpl(); }
 
 bool IicMasterModule::startTasks() { return startTasksImpl(); }
+
+void IicMasterModule::scanBus()
+{
+  if (!s_initialized)
+  {
+    LOG_PRINTLN(LOG_IIC, "[IIC] scan skipped: master not initialized");
+    return;
+  }
+
+  if (xSemaphoreTake(s_busMutex, pdMS_TO_TICKS(100)) != pdTRUE)
+  {
+    LOG_PRINTLN(LOG_IIC, "[IIC] scan skipped: bus busy");
+    return;
+  }
+
+  LOG_PRINTLN(LOG_IIC, "[IIC] scan start");
+  uint8_t foundCount = 0;
+  for (uint8_t addr = 0x08; addr <= 0x77; ++addr)
+  {
+    s_iicBus.beginTransmission(addr);
+    uint8_t err = s_iicBus.endTransmission(true);
+    if (err == 0)
+    {
+      ++foundCount;
+      LOG_PRINTF(LOG_IIC, "[IIC] found device addr=0x%02X\n", addr);
+    }
+  }
+
+  LOG_PRINTF(LOG_IIC, "[IIC] scan done, found=%u\n", foundCount);
+  xSemaphoreGive(s_busMutex);
+}
 
 bool IicMasterModule::pingNode(uint8_t address)
 {
@@ -596,6 +744,11 @@ bool IicMasterModule::sendProvisionConfig(uint8_t address, const char* ssid,
     LOG_PRINTLN(LOG_IIC, "[IIC] provision END frame failed");
     return false;
   }
+
+  s_pollSuspendUntilMs = millis() + IIC_MASTER_POST_PROVISION_SUSPEND_MS;
+  LOG_PRINTF(LOG_IIC,
+             "[IIC] provision done addr=0x%02X, suspend status poll %u ms\n",
+             address, (unsigned int)IIC_MASTER_POST_PROVISION_SUSPEND_MS);
 
   return true;
 }

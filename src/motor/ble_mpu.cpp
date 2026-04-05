@@ -9,7 +9,10 @@ BLE_MPU::BLE_MPU()
       pServer(nullptr),
       pTxCharacteristic(nullptr),
       pRxCharacteristic(nullptr),
-      lastRxTime(0)
+      lastRxTime(0),
+      lastBatteryLevel(100),
+      connectTimeMs(0),
+      firstBatterySent(false)
 {
   rxBuffer = "";
 }
@@ -50,7 +53,10 @@ void BLE_MPU::onConnect()
   connected = true;
   rxBuffer = "";  // 清空缓冲区
   lastRxTime = 0;
+  connectTimeMs = millis();  // 记录连接时间
+  firstBatterySent = false;   // 重置首次发送标志
   LOG_PRINTLN(LOG_BLE, "[BLE] ========== 客户端已连接 ==========");
+  LOG_PRINTLN(LOG_BLE, "[BLE] 等待2秒后发送第一次电量...");
 }
 
 // ========== 处理断开连接事件 ==========
@@ -100,15 +106,25 @@ void BLE_MPU::processRxBuffer()
 }
 
 // ========== tick函数 - 需要定期调用 ==========
-// 用于处理分包超时
+// 用于处理分包超时和延迟发送电量
 void BLE_MPU::tick()
 {
+  // 处理分包超时
   if (rxBuffer.length() > 0 && millis() - lastRxTime > 100)
   {
     // 超过100ms没有新数据,认为数据包完整
     LOG_PRINTLN(LOG_BLE, "[BLE] ---------- 超时,认为数据包完整 ----------");
     processRxBuffer();
     LOG_PRINTLN(LOG_BLE, "[BLE] ----------------------------------------");
+  }
+
+  // 延迟2秒发送第一次电量
+  if (connected && !firstBatterySent && connectTimeMs > 0 &&
+      millis() - connectTimeMs >= 2000)
+  {
+    firstBatterySent = true;
+    LOG_PRINTF(LOG_BLE, "[BLE] 连接后延迟2秒发送电量: %d%%\n", lastBatteryLevel);
+    sendBattery(lastBatteryLevel);
   }
 }
 
@@ -209,6 +225,8 @@ void BLE_MPU::sendFallAlert()
 // ========== 发送电量数据 ==========
 void BLE_MPU::sendBattery(int level)
 {
+  lastBatteryLevel = level;  // 保存电量值，用于新连接时发送
+
   if (connected && pTxCharacteristic != nullptr)
   {
     char buffer[16];

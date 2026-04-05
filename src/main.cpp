@@ -45,6 +45,10 @@ struct CameraNetConfig
 #define CAM_B_CAMERA_ID 2
 #endif
 
+#ifndef CAM_ENABLE_SECOND_CAMERA
+#define CAM_ENABLE_SECOND_CAMERA 0
+#endif
+
 #ifndef PROVISION_USE_HARDCODED_WIFI
 #define PROVISION_USE_HARDCODED_WIFI 1
 #endif
@@ -123,6 +127,35 @@ bool loadProjectProvisionData(String& outSsid, String& outPassword,
   return true;
 }
 
+bool checkCameraStartup(uint8_t address)
+{
+  // Give slave some time to finish boot and register callbacks.
+  for (int i = 0; i < 5; ++i)
+  {
+    if (esp32s3::IicMasterModule::pingNode(address))
+    {
+      esp32s3::iic::NodeStatus status = {};
+      if (esp32s3::IicMasterModule::getNodeStatus(address, &status))
+      {
+        ESP_LOGI(
+            TAG,
+            "CAMERA_STARTUP_OK addr=0x%02X online=%d err=%u seq=%u frame=%u",
+            address, status.online ? 1 : 0, status.lastError, status.lastSeq,
+            status.lastFrameCounter);
+      }
+      else
+      {
+        ESP_LOGI(TAG, "CAMERA_STARTUP_OK addr=0x%02X", address);
+      }
+      return true;
+    }
+    delay(100);
+  }
+
+  ESP_LOGE(TAG, "CAMERA_STARTUP_FAIL addr=0x%02X", address);
+  return false;
+}
+
 void pushCameraNetConfigToNode(const CameraNetConfig& config)
 {
   ESP_LOGI(TAG, "IIC provision start addr=0x%02X camera_id=%d", config.address,
@@ -153,11 +186,12 @@ void pushCameraNetConfig()
   CameraNetConfig camA = {CAM_TARGET_ADDR_A, projectSsid,   projectPassword,
                           CAM_A_WS_URL,      projectUserId, CAM_A_CAMERA_ID};
 
+  pushCameraNetConfigToNode(camA);
+#if CAM_ENABLE_SECOND_CAMERA
   CameraNetConfig camB = {CAM_TARGET_ADDR_B, projectSsid,   projectPassword,
                           CAM_B_WS_URL,      projectUserId, CAM_B_CAMERA_ID};
-
-  pushCameraNetConfigToNode(camA);
   pushCameraNetConfigToNode(camB);
+#endif
 }
 }  // namespace
 
@@ -166,27 +200,29 @@ void setup()
   Serial.begin(115200);
   delay(300);
 
-  // Keep a short burst to verify boot log visibility immediately after reset.
   Serial.println("setup begin");
-  Serial.println("setup begin");
-  Serial.println("setup begin");
-  Serial.println("setup begin");
-  ESP_LOGI(TAG, "setup begin");
-  // delay(1000);
-  // bool bootOk = esp32s3::AppModule::boot();
-  // ESP_LOGI(TAG, "AppModule::boot => %s", bootOk ? "OK" : "FAIL");
-  // if (!bootOk)
-  // {
-  //   LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
-  //   ESP_LOGE(TAG, "boot failed, skip provision");
-  //   return;
-  // }
 
-  // // 等待 IIC 轮询任务完成至少一次在线探测。
-  // delay(500);
-  // ESP_LOGI(TAG, "start pushing IIC provision payload");
-  // pushCameraNetConfig();
-  // ESP_LOGI(TAG, "setup done");
+  bool bootOk = esp32s3::AppModule::boot();
+  ESP_LOGI(TAG, "AppModule::boot => %s", bootOk ? "OK" : "FAIL");
+  if (!bootOk)
+  {
+    LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
+    ESP_LOGE(TAG, "boot failed, skip provision");
+    return;
+  }
+
+  // 等待 IIC 轮询任务完成至少一次在线探测。
+  delay(500);
+  esp32s3::IicMasterModule::scanBus();
+
+  (void)checkCameraStartup(CAM_TARGET_ADDR_A);
+#if CAM_ENABLE_SECOND_CAMERA
+  (void)checkCameraStartup(CAM_TARGET_ADDR_B);
+#endif
+
+  ESP_LOGI(TAG, "start pushing IIC provision payload");
+  pushCameraNetConfig();
+  ESP_LOGI(TAG, "setup done");
 }
 
 void loop()

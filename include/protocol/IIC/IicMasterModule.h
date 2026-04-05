@@ -23,6 +23,7 @@ class IicMasterModule
  public:
   static bool init();
   static bool startTasks();
+  static void scanBus();
 
   static bool pingNode(uint8_t address);
   static bool triggerCapture(uint8_t address);
