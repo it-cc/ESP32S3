@@ -257,22 +257,32 @@ bool MPU_Sensor::checkFall(float threshold)
   // 计算合加速度平方
   float accel_sq = ax_g * ax_g + ay_g * ay_g + az_g * az_g;
 
+  // 判断是否直立：z轴在水平方向为直立（az的绝对值接近1g为直立）
+  // 不直立条件：|az| < 0.7g (约45度角以下)
+  bool isNotUpright = (fabs(az_g) > 0.7f);
+
+  // 跌倒条件：加速度平方 > 阈值  AND  人物不直立
+  bool isFalling = (accel_sq >= threshold) && isNotUpright;
+
   // 串口输出调试信息
   // Serial.print("[MPU] 加速度平方: ");
   // Serial.print(accel_sq);
   // Serial.print(" (阈值: ");
   // Serial.print(threshold);
-  // Serial.print(") ");
-  if (accel_sq >= threshold)
+  // Serial.print("), az: ");
+  // Serial.print(az_g);
+  // Serial.print(", 不直立: ");
+  // Serial.print(isNotUpright ? "是" : "否");
+  if (isFalling)
   {
-    LOG_PRINTLN(LOG_MPU, "-> 超过阈值!");
+    LOG_PRINTLN(LOG_MPU, "-> 检测到跌倒!");
   }
   else
   {
     // Serial.println("-> 正常");
   }
 
-  return accel_sq >= threshold;
+  return isFalling;
 }
 
 // ========== 获取加速度计数据 ==========
