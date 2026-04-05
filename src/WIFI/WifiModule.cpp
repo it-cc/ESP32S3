@@ -22,6 +22,8 @@ TaskHandle_t s_wifiTaskHandle = NULL;
 WifiNotifyCallback s_notify = nullptr;
 bool s_wifiConnected = false;
 WifiCredentialStore s_store;
+String s_currentSsid;
+String s_currentPassword;
 
 void sendNotify(const String& message)
 {
@@ -42,6 +44,8 @@ void wifiTask(void* pvParameters)
   WiFi.mode(WIFI_STA);
   if (s_store.load(savedSsid, savedPassword))
   {
+    s_currentSsid = savedSsid;
+    s_currentPassword = savedPassword;
     LOG_PRINTLN(LOG_WIFI, "[WiFi Task] 检测到已保存凭据,自动连接...");
     WiFi.begin(savedSsid.c_str(), savedPassword.c_str());
 
@@ -200,6 +204,8 @@ bool esp32s3::WifiModule::handleBleCommand(const String& data)
       wifiConfig.clearOnly = false;
       ssid.toCharArray(wifiConfig.ssid, sizeof(wifiConfig.ssid));
       password.toCharArray(wifiConfig.password, sizeof(wifiConfig.password));
+      esp32s3::s_currentSsid = ssid;
+      esp32s3::s_currentPassword = password;
       xQueueSend(esp32s3::s_wifiConfigQueue, &wifiConfig, 0);
       return true;
     }
@@ -223,6 +229,8 @@ bool esp32s3::WifiModule::handleBleCommand(const String& data)
       wifiConfig.clearOnly = false;
       ssid.toCharArray(wifiConfig.ssid, sizeof(wifiConfig.ssid));
       password.toCharArray(wifiConfig.password, sizeof(wifiConfig.password));
+      esp32s3::s_currentSsid = ssid;
+      esp32s3::s_currentPassword = password;
       xQueueSend(esp32s3::s_wifiConfigQueue, &wifiConfig, 0);
       esp32s3::sendNotify("PROV:STATE:CONNECTING");
     }
@@ -266,4 +274,11 @@ bool esp32s3::WifiModule::handleBleCommand(const String& data)
 bool esp32s3::WifiModule::isConnected()
 {
   return esp32s3::s_wifiConnected && WiFi.status() == WL_CONNECTED;
+}
+
+String esp32s3::WifiModule::getCurrentSsid() { return esp32s3::s_currentSsid; }
+
+String esp32s3::WifiModule::getCurrentPassword()
+{
+  return esp32s3::s_currentPassword;
 }

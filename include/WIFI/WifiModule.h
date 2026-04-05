@@ -15,6 +15,8 @@ class WifiModule
                         uint32_t stackWords = 4096);
   static bool handleBleCommand(const String& data);
   static bool isConnected();
+  static String getCurrentSsid();
+  static String getCurrentPassword();
 };
 }  // namespace esp32s3
 

@@ -14,10 +14,6 @@
 #define LOG_MPU 1
 #endif
 
-#ifndef LOG_CAMERA
-#define LOG_CAMERA 1
-#endif
-
 #ifndef LOG_WIFI
 #define LOG_WIFI 1
 #endif

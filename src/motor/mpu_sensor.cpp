@@ -124,12 +124,11 @@ bool MPU_Sensor::init()
 {
   LOG_PRINTLN(LOG_MPU, "[MPU] ========== MPU6050初始化开始 ==========");
 
-  // 1. 初始化I2C总线并尝试探测MPU地址
-  I2CBusCandidate candidates[2] = {
+  // 1. 初始化I2C总线并探测MPU地址
+  I2CBusCandidate candidates[1] = {
       {MPU_I2C_SDA_PIN, MPU_I2C_SCL_PIN, "Primary MPU bus"},
-      {CAMERA_SCCB_SDA_PIN, CAMERA_SCCB_SCL_PIN, "Camera SCCB fallback"},
   };
-  const int candidateCount = MPU_I2C_TRY_CAMERA_SCCB ? 2 : 1;
+  const int candidateCount = 1;
 
   bool busReady = false;
   for (int i = 0; i < candidateCount; ++i)

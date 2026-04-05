@@ -39,13 +39,6 @@
 #define MPU_I2C_CLOCK_HZ 100000
 #endif
 
-#ifndef MPU_I2C_TRY_CAMERA_SCCB
-#define MPU_I2C_TRY_CAMERA_SCCB 1
-#endif
-
-#define CAMERA_SCCB_SDA_PIN 4
-#define CAMERA_SCCB_SCL_PIN 5
-
 class MPU_Sensor
 {
  public:

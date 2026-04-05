@@ -9,7 +9,7 @@ void setup()
   delay(1000);
   if (!esp32s3::AppModule::boot())
   {
-    LOG_PRINTLN(LOG_CAMERA, "[Main] module init/start has failures");
+    LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
   }
 }
 
