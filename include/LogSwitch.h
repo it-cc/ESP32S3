@@ -26,6 +26,10 @@
 #define LOG_ULTRASONIC 0
 #endif
 
+#ifndef LOG_IIC
+#define LOG_IIC 1
+#endif
+
 #define LOG_PRINT(enabled, msg)     \
   do                                \
   {                                 \

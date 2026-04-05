@@ -31,9 +31,19 @@ bool WifiCredentialStore::save(const char* ssid, const char* password)
 
 bool WifiCredentialStore::load(String& ssid, String& password)
 {
+  ssid = "";
+  password = "";
+
   Preferences pref;
   if (!pref.begin(WIFI_PREF_NAMESPACE, true))
   {
+    return false;
+  }
+
+  // Avoid noisy NOT_FOUND logs from getString when key is absent.
+  if (!pref.isKey(WIFI_PREF_KEY_SSID) || !pref.isKey(WIFI_PREF_KEY_PASS))
+  {
+    pref.end();
     return false;
   }
 
