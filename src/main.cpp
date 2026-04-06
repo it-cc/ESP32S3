@@ -202,31 +202,32 @@ void setup()
 
   Serial.println("setup begin");
 
-  bool bootOk = esp32s3::AppModule::boot();
-  ESP_LOGI(TAG, "AppModule::boot => %s", bootOk ? "OK" : "FAIL");
-  if (!bootOk)
-  {
-    LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
-    ESP_LOGE(TAG, "boot failed, skip provision");
-    return;
-  }
+  //   bool bootOk = esp32s3::AppModule::boot();
+  //   ESP_LOGI(TAG, "AppModule::boot => %s", bootOk ? "OK" : "FAIL");
+  //   if (!bootOk)
+  //   {
+  //     LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
+  //     ESP_LOGE(TAG, "boot failed, skip provision");
+  //     return;
+  //   }
 
-  // 等待 IIC 轮询任务完成至少一次在线探测。
-  delay(500);
-  esp32s3::IicMasterModule::scanBus();
+  //   // 等待 IIC 轮询任务完成至少一次在线探测。
+  //   delay(500);
+  //   esp32s3::IicMasterModule::scanBus();
 
-  (void)checkCameraStartup(CAM_TARGET_ADDR_A);
-#if CAM_ENABLE_SECOND_CAMERA
-  (void)checkCameraStartup(CAM_TARGET_ADDR_B);
-#endif
+  //   (void)checkCameraStartup(CAM_TARGET_ADDR_A);
+  // #if CAM_ENABLE_SECOND_CAMERA
+  //   (void)checkCameraStartup(CAM_TARGET_ADDR_B);
+  // #endif
 
-  ESP_LOGI(TAG, "start pushing IIC provision payload");
-  pushCameraNetConfig();
-  ESP_LOGI(TAG, "setup done");
+  //   ESP_LOGI(TAG, "start pushing IIC provision payload");
+  //   pushCameraNetConfig();
+  //   ESP_LOGI(TAG, "setup done");
 }
 
 void loop()
 {
   // 避免空转占满 CPU，保证系统任务调度稳定
+  Serial.println("setup begin");
   vTaskDelay(pdMS_TO_TICKS(1000));
 }
