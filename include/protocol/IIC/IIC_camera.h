@@ -22,6 +22,7 @@ struct __attribute__((packed)) CameraPackage
     this->password[sizeof(this->password) - 1] = '\0';
   }
 };
+
 struct __attribute__((packed)) SlaveStatus
 {
   uint8_t isReceived;   // 0x01
@@ -31,6 +32,7 @@ struct __attribute__((packed)) SlaveStatus
   char password[32];
   char httpUrl[64];
 };
+
 class Camera_IIC
 {
   CameraPackage cameraPacket_;

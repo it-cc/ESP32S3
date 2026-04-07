@@ -3,7 +3,6 @@
 #include "WIFI/WifiModule.h"
 #include "ble/BleModule.h"
 #include "motor/MotorModule.h"
-#include "protocol/IIC/IicMasterModule.h"
 #include "ultrasonic/ultrasonic.h"
 
 namespace esp32s3
@@ -46,86 +45,6 @@ class BootCoordinator
     return true;
   }
 
-  static bool handleIicCommand(const String& data)
-  {
-    const String cmdPing = "IIC_PING:";
-    const String cmdCapture = "IIC_CAPTURE:";
-    const String cmdReboot = "IIC_REBOOT:";
-    const String cmdStatus = "IIC_STATUS:";
-
-    uint8_t address = 0;
-
-    if (data.startsWith(cmdPing))
-    {
-      if (!parseNodeAddress(data.substring(cmdPing.length()), &address))
-      {
-        BleModule::sendMessage("IIC_PING_FAIL:BAD_ADDR");
-        return true;
-      }
-
-      bool ok = IicMasterModule::pingNode(address);
-      BleModule::sendMessage(ok ? "IIC_PING_OK" : "IIC_PING_FAIL");
-      return true;
-    }
-
-    if (data.startsWith(cmdCapture))
-    {
-      if (!parseNodeAddress(data.substring(cmdCapture.length()), &address))
-      {
-        BleModule::sendMessage("IIC_CAPTURE_FAIL:BAD_ADDR");
-        return true;
-      }
-
-      bool ok = IicMasterModule::triggerCapture(address);
-      BleModule::sendMessage(ok ? "IIC_CAPTURE_OK" : "IIC_CAPTURE_FAIL");
-      return true;
-    }
-
-    if (data.startsWith(cmdReboot))
-    {
-      if (!parseNodeAddress(data.substring(cmdReboot.length()), &address))
-      {
-        BleModule::sendMessage("IIC_REBOOT_FAIL:BAD_ADDR");
-        return true;
-      }
-
-      bool ok = IicMasterModule::rebootNode(address);
-      BleModule::sendMessage(ok ? "IIC_REBOOT_OK" : "IIC_REBOOT_FAIL");
-      return true;
-    }
-
-    if (data.startsWith(cmdStatus))
-    {
-      if (!parseNodeAddress(data.substring(cmdStatus.length()), &address))
-      {
-        BleModule::sendMessage("IIC_STATUS_FAIL:BAD_ADDR");
-        return true;
-      }
-
-      iic::NodeStatus nodeStatus = {};
-      if (!IicMasterModule::getNodeStatus(address, &nodeStatus))
-      {
-        BleModule::sendMessage("IIC_STATUS_FAIL:NO_NODE");
-        return true;
-      }
-
-      String message = "IIC_STATUS:";
-      message += String(nodeStatus.address);
-      message += ",online=";
-      message += (nodeStatus.online ? "1" : "0");
-      message += ",err=";
-      message += String(nodeStatus.lastError);
-      message += ",seq=";
-      message += String(nodeStatus.lastSeq);
-      message += ",frame=";
-      message += String(nodeStatus.lastFrameCounter);
-      BleModule::sendMessage(message);
-      return true;
-    }
-
-    return false;
-  }
-
   static void forwardWifiNotifyToBle(const String& message)
   {
     BleModule::sendMessage(message);
@@ -133,11 +52,6 @@ class BootCoordinator
 
   static bool handleWifiBleBridgeCommand(const String& data)
   {
-    if (handleIicCommand(data))
-    {
-      return true;
-    }
-
     return WifiModule::handleBleCommand(data);
   }
 };
@@ -148,7 +62,6 @@ bool AppModule::boot()
   bool motorInitOk = MotorModule::init();
   bool bleInitOk = BleModule::init();
   bool wifiInitOk = WifiModule::init(BootCoordinator::forwardWifiNotifyToBle);
-  bool iicInitOk = IicMasterModule::init();
   bool ultrasonicInitOk =
       UltrasonicModule::init0(ULTRASONIC_TRIG_PIN0, ULTRASONIC_ECHO_PIN0) &&
       UltrasonicModule::init1(ULTRASONIC_TRIG_PIN1, ULTRASONIC_ECHO_PIN1);
@@ -175,17 +88,13 @@ bool AppModule::boot()
   {
     wifiTaskOk = WifiModule::startTask(1, 0, 4096);
   }
-  if (iicInitOk)
-  {
-    iicTaskOk = IicMasterModule::startTasks();
-  }
   if (ultrasonicInitOk)
   {
     ultrasonicTaskOk = UltrasonicModule::startTask();
   }
 
-  return motorInitOk && bleInitOk && wifiInitOk && iicInitOk &&
-         ultrasonicInitOk && motorTaskOk && bleTaskOk && wifiTaskOk &&
-         iicTaskOk && ultrasonicTaskOk;
+  return motorInitOk && bleInitOk && wifiInitOk && ultrasonicInitOk &&
+         motorTaskOk && bleTaskOk && wifiTaskOk && iicTaskOk &&
+         ultrasonicTaskOk;
 }
 }  // namespace esp32s3
