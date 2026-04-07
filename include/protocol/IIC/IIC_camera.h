@@ -27,6 +27,9 @@ struct __attribute__((packed)) SlaveStatus
   uint8_t isReceived;   // 0x01
   uint8_t isSetWifi;    // 0x02
   uint8_t isgetUserID;  // 0x04
+  char ssid[32];
+  char password[32];
+  char httpUrl[64];
 };
 class Camera_IIC
 {
@@ -39,6 +42,7 @@ class Camera_IIC
   Camera_IIC(int sdaPin, int sclPin, uint32_t frequency, int address);
   byte sendPacket(const CameraPackage& cameraPacket);
   uint8_t requestStatus();
+  SlaveStatus getSlaveStatus() const;
 
  private:
   void searchError(byte error);

@@ -12,14 +12,10 @@ void setup()
 {
   Serial.begin(115200);
   delay(1000);
-  // if (!esp32s3::AppModule::boot())
-  // {
-  //   LOG_PRINTLN(LOG_WIFI, "[Main] module init/start has failures");
-  // }
   // Keep the IIC master object alive for the full application lifetime.
   static esp32s3::Camera_IIC iic(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
                                  CAMERA1_IIC_ADDRESS);
-  esp32s3::CameraPackage cameraPacket(1, "Redmi", "88889999");
+  esp32s3::CameraPackage cameraPacket(1, "Nanami", "0d000721");
   byte error;
   do
   {
@@ -32,6 +28,9 @@ void setup()
     status = iic.requestStatus();
     delay(500);
   } while (status != 0x00);
+  Serial.println(iic.getSlaveStatus().ssid);
+  Serial.println(iic.getSlaveStatus().password);
+  Serial.println("httpUrl: " + String(iic.getSlaveStatus().httpUrl));
 }
 
 void loop()
