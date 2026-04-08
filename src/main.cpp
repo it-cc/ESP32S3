@@ -10,8 +10,8 @@
 
 #define CAMERA1_IIC_ADDRESS 0x42
 #define CAMERA2_IIC_ADDRESS 0x43
-#define IIC_SCL_PIN 9
-#define IIC_SDA_PIN 8
+#define IIC_SCL_PIN 19
+#define IIC_SDA_PIN 18
 #define IIC_FREQUENCY 100000
 
 esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
@@ -58,6 +58,8 @@ void setup()
   sendWifiToCamera(iic1, 1, ssid, password);
   Serial.println("Camera 1 Ready: ");
   Serial.println("httpUrl 1: " + String(iic1.getSlaveStatus().httpUrl));
+
+  delay(1000);  // 两个摄像头之间加延时
 
   sendWifiToCamera(iic2, 2, ssid, password);
   Serial.println("Camera 2 Ready: ");

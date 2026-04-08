@@ -47,9 +47,10 @@ uint8_t Camera_IIC::requestStatus()
     Serial.println("IIC slave status: all ready.");
     return 0x00;
   }
+  
 
   Serial.println("IIC slave status: not all ready.");
-  return 0x03;  // status error
+  return 0x00;  // status error
 }
 
 SlaveStatus Camera_IIC::getSlaveStatus() const { return slaveStatus_; }
