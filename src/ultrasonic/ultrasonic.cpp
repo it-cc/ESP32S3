@@ -165,6 +165,9 @@ void UltrasonicModule::task(void* pvParameters)
     s_latestDistanceMm0 = distanceMm0;
     float distanceMm1 = measureDistanceMm1();
     s_latestDistanceMm1 = distanceMm1;
+    Serial.println("[Ultrasonic] distance0: " + String(distanceMm0) + " mm, distance1: " + String(distanceMm1) + " mm");
+    Serial.println("[Ultrasonic] ----------");
+    vTaskDelay(5000);
 
     if (distanceMm0 < 0)
     {

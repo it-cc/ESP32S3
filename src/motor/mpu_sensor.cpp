@@ -13,8 +13,8 @@ struct I2CBusCandidate
 
 static bool isMpuAddressAcked()
 {
-  Wire.beginTransmission(MPU6050_ADDR);
-  uint8_t err = Wire.endTransmission();
+  Wire1.beginTransmission(MPU6050_ADDR);
+  uint8_t err = Wire1.endTransmission();
   return err == 0;
 }
 }  // namespace
@@ -34,10 +34,10 @@ MPU_Sensor::MPU_Sensor()
 // ========== I2C写寄存器 ==========
 void MPU_Sensor::writeReg(uint8_t reg, uint8_t data)
 {
-  Wire.beginTransmission(MPU6050_ADDR);
-  Wire.write(reg);
-  Wire.write(data);
-  uint8_t err = Wire.endTransmission();
+  Wire1.beginTransmission(MPU6050_ADDR);
+  Wire1.write(reg);
+  Wire1.write(data);
+  uint8_t err = Wire1.endTransmission();
   if (err != 0)
   {
     LOG_PRINTF(LOG_MPU, "[MPU] I2C write failed, reg=0x%02X err=%u\n", reg,
@@ -53,9 +53,9 @@ uint8_t MPU_Sensor::readReg(uint8_t reg, bool* ok)
     *ok = false;
   }
 
-  Wire.beginTransmission(MPU6050_ADDR);
-  Wire.write(reg);
-  uint8_t txErr = Wire.endTransmission(false);
+  Wire1.beginTransmission(MPU6050_ADDR);
+  Wire1.write(reg);
+  uint8_t txErr = Wire1.endTransmission(false);
   if (txErr != 0)
   {
     LOG_PRINTF(LOG_MPU, "[MPU] I2C read tx failed, reg=0x%02X err=%u\n", reg,
@@ -63,8 +63,8 @@ uint8_t MPU_Sensor::readReg(uint8_t reg, bool* ok)
     return 0xFF;
   }
 
-  size_t got = Wire.requestFrom((uint8_t)MPU6050_ADDR, (uint8_t)1);
-  if (got != 1 || Wire.available() < 1)
+  size_t got = Wire1.requestFrom((uint8_t)MPU6050_ADDR, (uint8_t)1);
+  if (got != 1 || Wire1.available() < 1)
   {
     LOG_PRINTF(LOG_MPU, "[MPU] I2C read rx failed, reg=0x%02X got=%u\n", reg,
                (unsigned int)got);
@@ -75,7 +75,7 @@ uint8_t MPU_Sensor::readReg(uint8_t reg, bool* ok)
   {
     *ok = true;
   }
-  return (uint8_t)Wire.read();
+  return (uint8_t)Wire1.read();
 }
 
 // ========== I2C连续读多个字节 ==========
@@ -86,9 +86,9 @@ bool MPU_Sensor::readBytes(uint8_t reg, uint8_t* data, uint8_t len)
     return false;
   }
 
-  Wire.beginTransmission(MPU6050_ADDR);
-  Wire.write(reg);
-  uint8_t txErr = Wire.endTransmission(false);
+  Wire1.beginTransmission(MPU6050_ADDR);
+  Wire1.write(reg);
+  uint8_t txErr = Wire1.endTransmission(false);
   if (txErr != 0)
   {
     LOG_PRINTF(LOG_MPU, "[MPU] I2C burst tx failed, reg=0x%02X err=%u\n", reg,
@@ -96,7 +96,7 @@ bool MPU_Sensor::readBytes(uint8_t reg, uint8_t* data, uint8_t len)
     return false;
   }
 
-  size_t got = Wire.requestFrom((uint8_t)MPU6050_ADDR, len);
+  size_t got = Wire1.requestFrom((uint8_t)MPU6050_ADDR, len);
   if (got != len)
   {
     LOG_PRINTF(LOG_MPU,
@@ -107,13 +107,13 @@ bool MPU_Sensor::readBytes(uint8_t reg, uint8_t* data, uint8_t len)
 
   for (uint8_t i = 0; i < len; i++)
   {
-    if (Wire.available() < 1)
+    if (Wire1.available() < 1)
     {
       LOG_PRINTF(LOG_MPU, "[MPU] I2C burst rx empty at index=%u, reg=0x%02X\n",
                  i, reg);
       return false;
     }
-    data[i] = Wire.read();
+    data[i] = Wire1.read();
   }
 
   return true;
@@ -136,8 +136,8 @@ bool MPU_Sensor::init()
     LOG_PRINTF(LOG_MPU, "[MPU] 探测I2C总线: %s (SDA=GPIO%d, SCL=GPIO%d)\n",
                candidates[i].name, candidates[i].sda, candidates[i].scl);
 
-    Wire.begin(candidates[i].sda, candidates[i].scl);
-    Wire.setClock(MPU_I2C_CLOCK_HZ);
+    Wire1.begin(candidates[i].sda, candidates[i].scl);
+    Wire1.setClock(MPU_I2C_CLOCK_HZ);
     delay(10);
 
     if (isMpuAddressAcked())
