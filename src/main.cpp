@@ -8,21 +8,18 @@
 #include "app/AppModule.h"
 #include "protocol/IIC/IIC_camera.h"
 
-#define CAMERA1_IIC_ADDRESS 0x42
-#define CAMERA2_IIC_ADDRESS 0x43
+#define CAMERA_IIC_ADDRESS 0x42
 #define IIC_SCL_PIN 19
 #define IIC_SDA_PIN 18
 #define IIC_FREQUENCY 100000
 
 esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
-                         CAMERA1_IIC_ADDRESS);
-esp32s3::Camera_IIC iic2(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
-                         CAMERA2_IIC_ADDRESS);
+                         CAMERA_IIC_ADDRESS);
 
-void sendWifiToCamera(esp32s3::Camera_IIC& targetIic, uint8_t userId,
-                      const String& ssid, const String& password)
+void sendMsgToCamera(esp32s3::Camera_IIC& targetIic, uint8_t userID,
+                     const String& ssid, const String& password)
 {
-  esp32s3::CameraPackage cameraPacket(userId, ssid.c_str(), password.c_str());
+  esp32s3::CameraPackage cameraPacket(userID, ssid.c_str(), password.c_str());
   byte error;
   do
   {
@@ -35,6 +32,7 @@ void sendWifiToCamera(esp32s3::Camera_IIC& targetIic, uint8_t userId,
     status = targetIic.requestStatus();
     delay(500);
   } while (status != 0x00);
+  targetIic.end();
 }
 
 void setup()
@@ -55,15 +53,9 @@ void setup()
     delay(500);
   }
 
-  sendWifiToCamera(iic1, 1, ssid, password);
-  Serial.println("Camera 1 Ready: ");
+  sendMsgToCamera(iic1, 1, ssid, password);
+  Serial.println("Camera Ready: ");
   Serial.println("httpUrl 1: " + String(iic1.getSlaveStatus().httpUrl));
-
-  delay(1000);  // 两个摄像头之间加延时
-
-  sendWifiToCamera(iic2, 2, ssid, password);
-  Serial.println("Camera 2 Ready: ");
-  Serial.println("httpUrl 2: " + String(iic2.getSlaveStatus().httpUrl));
 }
 
 void loop()
