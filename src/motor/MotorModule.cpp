@@ -11,6 +11,8 @@ namespace esp32s3
 #define MOTOR_PIN_2 40
 #define MOTOR_PIN_3 41
 #define MOTOR_PIN_4 42
+#define MOTOR_PIN_5 45
+#define MOTOR_PIN_6 48
 
 typedef enum
 {
@@ -29,31 +31,35 @@ bool motorRunning = false;
 int motorTargetAngle = 0;
 bool s_motorInitialized = false;
 
-void calculateMotors(int angle, bool* m1, bool* m2, bool* m3, bool* m4)
+void calculateMotors(int angle, bool* m1, bool* m2, bool* m3, bool* m4, bool* m5, bool* m6)
 {
   *m1 = (angle >= -60 && angle <= 60);
   *m2 = (angle >= 30 && angle <= 150);
   *m3 = (angle >= -120 && angle <= 120);
   *m4 = (angle >= -150 && angle <= -30);
+  *m5 = (angle >= 60 && angle <= 180);
+  *m6 = (angle >= -180 && angle <= -60);
 
   LOG_PRINTF(
       LOG_MOTOR,
-      "[Motor] 角度: %d | 马达1: %s | 马达2: %s | 马达3: %s | 马达4: %s\n",
+      "[Motor] 角度: %d | 马达1: %s | 马达2: %s | 马达3: %s | 马达4: %s | 马达5: %s | 马达6: %s\n",
       angle, *m1 ? "ON" : "OFF", *m2 ? "ON" : "OFF", *m3 ? "ON" : "OFF",
-      *m4 ? "ON" : "OFF");
+      *m4 ? "ON" : "OFF", *m5 ? "ON" : "OFF", *m6 ? "ON" : "OFF");
 }
 
-void setMotors(bool m1, bool m2, bool m3, bool m4)
+void setMotors(bool m1, bool m2, bool m3, bool m4, bool m5, bool m6)
 {
   digitalWrite(MOTOR_PIN_1, m1 ? HIGH : LOW);
   digitalWrite(MOTOR_PIN_2, m2 ? HIGH : LOW);
   digitalWrite(MOTOR_PIN_3, m3 ? HIGH : LOW);
   digitalWrite(MOTOR_PIN_4, m4 ? HIGH : LOW);
+  digitalWrite(MOTOR_PIN_5, m5 ? HIGH : LOW);
+  digitalWrite(MOTOR_PIN_6, m6 ? HIGH : LOW);
 }
 
 void stopAllMotors()
 {
-  setMotors(false, false, false, false);
+  setMotors(false, false, false, false, false, false);
   LOG_PRINTLN(LOG_MOTOR, "[Motor] 所有马达已停止");
 }
 
@@ -63,6 +69,8 @@ void initMotorPins()
   pinMode(MOTOR_PIN_2, OUTPUT);
   pinMode(MOTOR_PIN_3, OUTPUT);
   pinMode(MOTOR_PIN_4, OUTPUT);
+  pinMode(MOTOR_PIN_5, OUTPUT);
+  pinMode(MOTOR_PIN_6, OUTPUT);
   stopAllMotors();
   LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达引脚初始化完成");
 }
@@ -78,6 +86,8 @@ void motorTask(void* pvParameters)
   bool currentM2 = false;
   bool currentM3 = false;
   bool currentM4 = false;
+  bool currentM5 = false;
+  bool currentM6 = false;
 
   LOG_PRINTLN(LOG_MOTOR, "[Motor Task] 任务已启动, 运行在 Core 0");
 
@@ -93,8 +103,8 @@ void motorTask(void* pvParameters)
         motorLastToggle0 = millis();
 
         calculateMotors(motorTargetAngle, &currentM1, &currentM2, &currentM3,
-                        &currentM4);
-        setMotors(currentM1, currentM2, currentM3, currentM4);
+                        &currentM4, &currentM5, &currentM6);
+        setMotors(currentM1, currentM2, currentM3, currentM4, currentM5, currentM6);
 
         LOG_PRINTF(LOG_MOTOR, "[Motor] 开始振动, 目标角度: %d\n",
                    motorTargetAngle);
@@ -118,8 +128,8 @@ void motorTask(void* pvParameters)
         if (motorState0)
         {
           calculateMotors(motorTargetAngle, &currentM1, &currentM2, &currentM3,
-                          &currentM4);
-          setMotors(currentM1, currentM2, currentM3, currentM4);
+                          &currentM4, &currentM5, &currentM6);
+          setMotors(currentM1, currentM2, currentM3, currentM4, currentM5, currentM6);
           LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达开启");
         }
         else
@@ -138,12 +148,12 @@ void motorTask(void* pvParameters)
            if(UltrasonicModule::getLatestDistanceMm0() < 100)
            {
              LOG_PRINTLN(LOG_ULTRASONIC, "[Ultrasonic] 检测到左前方障碍物, 开始震动");
-             setMotors(1, 1, 0, 0);
+             setMotors(1, 1, 0, 0, 0, 0);
            }
            if(UltrasonicModule::getLatestDistanceMm1() < 100)
            {
             LOG_PRINTLN(LOG_ULTRASONIC, "[Ultrasonic] 检测到右前方障碍物, 开始震动");
-             setMotors(1, 0, 0, 1);
+             setMotors(1, 0, 0, 1, 0, 0);
            }
         }
         else

@@ -28,11 +28,11 @@
 
 // ========== 引脚定义 ==========
 #ifndef MPU_I2C_SDA_PIN
-#define MPU_I2C_SDA_PIN 21
+#define MPU_I2C_SDA_PIN 47
 #endif
 
 #ifndef MPU_I2C_SCL_PIN
-#define MPU_I2C_SCL_PIN 20
+#define MPU_I2C_SCL_PIN 21
 #endif
 
 #ifndef MPU_I2C_CLOCK_HZ

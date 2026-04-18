@@ -28,6 +28,7 @@ bool s_initialized = false;
 bool s_mpuReady = false;
 volatile float s_fallThresholdG2 = FALL_THRESHOLD;
 BleExternalCommandHandler s_externalHandler = nullptr;
+int g_userId = 0;
 
 typedef struct
 {
@@ -61,6 +62,27 @@ void bleDataCallback(String data)
     {
       LOG_PRINTF(LOG_BLE, "[BLE] 阈值无效(%.2f), 允许范围: 0.5~20.0 g²\n",
                  newThreshold);
+    }
+  }
+  else if (data.startsWith("id:") || data.startsWith("id："))
+  {
+    LOG_PRINTLN(LOG_BLE, "[BLE] 命令: 设置用户ID");
+    int colonPos = data.indexOf(':');
+    if (colonPos < 0)
+    {
+      colonPos = data.indexOf('：');
+    }
+    if (colonPos > 0)
+    {
+      String idStr = data.substring(colonPos + 1);
+      idStr.trim();
+      int newId = idStr.toInt();
+      g_userId = newId;
+      LOG_PRINTF(LOG_BLE, "[BLE] 用户ID已设置: %d\n", g_userId);
+    }
+    else
+    {
+      LOG_PRINTLN(LOG_BLE, "[BLE] 错误: ID格式不正确,应为 id:1 或 id：1");
     }
   }
   else if (data.startsWith("change:"))
@@ -193,17 +215,24 @@ void batteryTask(void* pvParameters)
                  (unsigned)stackWordsLeft);
     }
 
+    // 随机减少电量（1-3%）
+    int discharge = random(1, 4);
+    battery = battery - discharge;
+    if (battery < 10)
+    {
+      battery = random(81, 101);  // 电量低时重新充到80-100%
+    }
+
     if (battery != lastBattery)
     {
       LOG_PRINTF(LOG_BATTERY, "[Battery Task] 电量变化: %d%%\n", battery);
       ble.sendBattery(battery);
       lastBattery = battery;
     }
-    else
-    {
-      int time = random(1, 5);
-      vTaskDelay(pdMS_TO_TICKS(time * 100 * 60));
-    }
+
+    // 延时3-8分钟后更新电量
+    int time = random(3, 9);
+    vTaskDelay(pdMS_TO_TICKS(time * 60 * 1000));
   }
 }
 

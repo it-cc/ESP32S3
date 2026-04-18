@@ -15,11 +15,11 @@
 #endif
 
 #ifndef ULTRASONIC_TRIG_PIN1
-#define ULTRASONIC_TRIG_PIN1 3
+#define ULTRASONIC_TRIG_PIN1 0
 #endif
 
 #ifndef ULTRASONIC_ECHO_PIN1
-#define ULTRASONIC_ECHO_PIN1 6
+#define ULTRASONIC_ECHO_PIN1 38
 #endif
 
 namespace esp32s3
