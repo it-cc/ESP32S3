@@ -40,6 +40,7 @@ uint8_t Camera_IIC::requestStatus()
       *p++ = Wire.read();
     }
   }
+  
   if (slaveStatus_.isAllReady == 0x02)  // all ready
   {
     isAllReady_ = true;

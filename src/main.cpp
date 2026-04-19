@@ -6,6 +6,7 @@
 #include "WIFI/WifiCredentialStore.h"
 #include "WIFI/WifiModule.h"
 #include "app/AppModule.h"
+#include "ble/BleModule.h"
 #include "protocol/IIC/IIC_camera.h"
 
 #define CAMERA_IIC_ADDRESS 0x42
@@ -53,9 +54,7 @@ void setup()
     delay(500);
   }
 
-  sendMsgToCamera(iic1, 1, ssid, password);
-  Serial.println("Camera Ready: ");
-  Serial.println("httpUrl 1: " + String(iic1.getSlaveStatus().httpUrl));
+  sendMsgToCamera(iic1, esp32s3::BleModule::getUserId(), ssid, password);
 }
 
 void loop()
