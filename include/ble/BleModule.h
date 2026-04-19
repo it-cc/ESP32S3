@@ -14,6 +14,7 @@ class BleModule
   static bool startTasks();
   static void sendMessage(const String& message);
   static void registerExternalCommandHandler(BleExternalCommandHandler handler);
+  static int getUserId();
 };
 }  // namespace esp32s3
 

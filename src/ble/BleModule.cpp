@@ -321,3 +321,5 @@ void esp32s3::BleModule::registerExternalCommandHandler(
 {
   esp32s3::s_externalHandler = handler;
 }
+
+int esp32s3::BleModule::getUserId() { return esp32s3::g_userId; }
