@@ -23,17 +23,14 @@ void sendMsgToCamera(esp32s3::Camera_IIC& targetIic, uint8_t userID,
 {
   esp32s3::CameraPackage cameraPacket(userID, ssid.c_str(), password.c_str());
   byte error;
+  uint8_t status;
   do
   {
     error = targetIic.sendPacket(cameraPacket);
     delay(500);
-  } while (error != 0);
-  uint8_t status;
-  do
-  {
     status = targetIic.requestStatus();
-    delay(500);
-  } while (status != 0x00);
+  } while (error != 0 || status != 0x00);
+
   targetIic.end();
 }
 

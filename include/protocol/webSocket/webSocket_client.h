@@ -15,6 +15,7 @@ class WebsocketClient
 
  private:
   WebSocketsClient webSocket_;
+  bool initialized_;
 };
 }  // namespace esp32camera
 

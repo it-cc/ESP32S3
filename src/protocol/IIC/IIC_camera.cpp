@@ -48,7 +48,7 @@ uint8_t Camera_IIC::requestStatus()
     return 0x00;
   }
   Serial.println("[request] IIC slave status: not all ready.");
-  return 0x00;  // status error
+  return 0x03;  // status error
 }
 
 void Camera_IIC::end() { Wire1.end(); }
