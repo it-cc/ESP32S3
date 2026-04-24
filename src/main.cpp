@@ -7,15 +7,16 @@
 #include "WIFI/WifiModule.h"
 #include "app/AppModule.h"
 #include "ble/BleModule.h"
+#include "camera/CameraWebserver.h"
+#include "config/app_config.h"
 #include "protocol/IIC/IIC_camera.h"
+#include "protocol/http/http_client.h"
+#include "protocol/webSocket/webSocket_client.h"
 
 #define CAMERA_IIC_ADDRESS 0x42
 #define IIC_SCL_PIN 19
 #define IIC_SDA_PIN 20
 #define IIC_FREQUENCY 100000
-
-esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
-                         CAMERA_IIC_ADDRESS);
 
 void sendMsgToCamera(esp32s3::Camera_IIC& targetIic, uint8_t userID,
                      const String& ssid, const String& password)
@@ -54,7 +55,19 @@ void setup()
     delay(500);
   }
 
-  sendMsgToCamera(iic1, esp32s3::BleModule::getUserId(), ssid, password);
+  {
+    esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
+                             CAMERA_IIC_ADDRESS);
+    sendMsgToCamera(iic1, esp32s3::BleModule::getUserId(), ssid, password);
+  }
+
+  bool cameraInitOk = cameraInit(false);
+  if (cameraInitOk)
+  {
+    static esp32camera::WebsocketClient webSocketClient(
+        esp32camera::webSocket_host, esp32camera::webSocket_port,
+        esp32camera::webSocket_path);
+  }
 }
 
 void loop()

@@ -6,21 +6,21 @@ namespace esp32s3
 Camera_IIC::Camera_IIC(int sdaPin, int sclPin, uint32_t frequency, int address)
     : isAllReady_(false), address_(address)
 {
-  Wire.begin(sdaPin, sclPin, frequency);
+  Wire1.begin(sdaPin, sclPin, frequency);
 }
 
 byte Camera_IIC::sendPacket(const CameraPackage& cameraPacket)
 {
-  Wire.beginTransmission(address_);
-  Wire.write((uint8_t*)&cameraPacket, sizeof(CameraPackage));
-  byte error = Wire.endTransmission();
+  Wire1.beginTransmission(address_);
+  Wire1.write((uint8_t*)&cameraPacket, sizeof(CameraPackage));
+  byte error = Wire1.endTransmission();
   searchError(error);
   return error;
 }
 
 uint8_t Camera_IIC::requestStatus()
 {
-  uint8_t bytesReceived = Wire.requestFrom(address_, sizeof(SlaveStatus));
+  uint8_t bytesReceived = Wire1.requestFrom(address_, sizeof(SlaveStatus));
   if (bytesReceived == 0)
   {
     Serial.println("[request] No data received from IIC slave.");
@@ -35,12 +35,12 @@ uint8_t Camera_IIC::requestStatus()
   {
     uint8_t* p = (uint8_t*)&slaveStatus_;
 
-    while (Wire.available())
+    while (Wire1.available())
     {
-      *p++ = Wire.read();
+      *p++ = Wire1.read();
     }
   }
-  
+
   if (slaveStatus_.isAllReady == 0x02)  // all ready
   {
     isAllReady_ = true;
@@ -51,10 +51,7 @@ uint8_t Camera_IIC::requestStatus()
   return 0x00;  // status error
 }
 
-void Camera_IIC::end()
-{
-  Wire.end();
-}
+void Camera_IIC::end() { Wire1.end(); }
 
 SlaveStatus Camera_IIC::getSlaveStatus() const { return slaveStatus_; }
 

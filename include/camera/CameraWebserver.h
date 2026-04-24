@@ -14,7 +14,7 @@
 void startCameraServer();
 void setupLedFlash();
 
-bool cameraInit(bool startWebServer = true)
+inline bool cameraInit(bool startWebServer = true)
 {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -117,6 +117,8 @@ bool cameraInit(bool startWebServer = true)
   {
     startCameraServer();
   }
+
+  Serial.println("Camera init done");
   return true;
 }
 

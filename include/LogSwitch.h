@@ -23,7 +23,7 @@
 #endif
 
 #ifndef LOG_ULTRASONIC
-#define LOG_ULTRASONIC 0
+#define LOG_ULTRASONIC 1
 #endif
 
 #ifndef LOG_IIC

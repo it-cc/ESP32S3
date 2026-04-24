@@ -2,12 +2,9 @@
 
 #include "WIFI/WifiModule.h"
 #include "ble/BleModule.h"
-#include "camera/CameraWebserver.h"
-#include "config/app_config.h"
 #include "motor/MotorModule.h"
-#include "protocol/http/http_client.h"
-#include "protocol/webSocket/webSocket_client.h"
 #include "ultrasonic/ultrasonic.h"
+
 namespace esp32s3
 {
 namespace
@@ -69,7 +66,6 @@ bool AppModule::boot()
       UltrasonicModule::init0(ULTRASONIC_TRIG_PIN0, ULTRASONIC_ECHO_PIN0) &&
       UltrasonicModule::init1(ULTRASONIC_TRIG_PIN1, ULTRASONIC_ECHO_PIN1);
   // Initialize camera only; skip local web server when running as HTTP client.
-  bool cameraInitOk = cameraInit(false);
   BleModule::registerExternalCommandHandler(
       BootCoordinator::handleWifiBleBridgeCommand);
 
@@ -95,13 +91,9 @@ bool AppModule::boot()
   {
     ultrasonicTaskOk = UltrasonicModule::startTask();
   }
-  // websocket client test
-  static esp32camera::WebsocketClient webSocketClient(
-      esp32camera::webSocket_host, esp32camera::webSocket_port,
-      esp32camera::webSocket_path);
 
   return motorInitOk && bleInitOk && wifiInitOk && ultrasonicInitOk &&
-         cameraInitOk && motorTaskOk && bleTaskOk && wifiTaskOk && iicTaskOk &&
+         motorTaskOk && bleTaskOk && wifiTaskOk && iicTaskOk &&
          ultrasonicTaskOk;
 }
 }  // namespace esp32s3
