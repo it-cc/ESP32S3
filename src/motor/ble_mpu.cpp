@@ -54,7 +54,7 @@ void BLE_MPU::onConnect()
   rxBuffer = "";  // 清空缓冲区
   lastRxTime = 0;
   connectTimeMs = millis();  // 记录连接时间
-  firstBatterySent = false;   // 重置首次发送标志
+  firstBatterySent = false;  // 重置首次发送标志
   LOG_PRINTLN(LOG_BLE, "[BLE] ========== 客户端已连接 ==========");
   LOG_PRINTLN(LOG_BLE, "[BLE] 等待2秒后发送第一次电量...");
 }
@@ -110,9 +110,9 @@ void BLE_MPU::processRxBuffer()
 void BLE_MPU::tick()
 {
   // 处理分包超时
-  if (rxBuffer.length() > 0 && millis() - lastRxTime > 100)
+  if (rxBuffer.length() > 0 && millis() - lastRxTime > 500)
   {
-    // 超过100ms没有新数据,认为数据包完整
+    // 超过500ms没有新数据,认为数据包完整
     LOG_PRINTLN(LOG_BLE, "[BLE] ---------- 超时,认为数据包完整 ----------");
     processRxBuffer();
     LOG_PRINTLN(LOG_BLE, "[BLE] ----------------------------------------");
@@ -123,7 +123,8 @@ void BLE_MPU::tick()
       millis() - connectTimeMs >= 2000)
   {
     firstBatterySent = true;
-    LOG_PRINTF(LOG_BLE, "[BLE] 连接后延迟2秒发送电量: %d%%\n", lastBatteryLevel);
+    LOG_PRINTF(LOG_BLE, "[BLE] 连接后延迟2秒发送电量: %d%%\n",
+               lastBatteryLevel);
     sendBattery(lastBatteryLevel);
   }
 }
@@ -134,6 +135,9 @@ void BLE_MPU::init(const char* deviceName)
   LOG_PRINTLN(LOG_BLE, "[BLE] 初始化BLE设备...");
 
   BLEDevice::init(deviceName);
+  // 增加MTU大小，允许单包接收超过20字节的数据
+  BLEDevice::setMTU(512);
+
   LOG_PRINTF(LOG_BLE, "[BLE] 设备名设置为: %s\n", deviceName);
 
   pServer = BLEDevice::createServer();

@@ -52,11 +52,11 @@ void setup()
     delay(500);
   }
 
-  {
-    esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
-                             CAMERA_IIC_ADDRESS);
-    sendMsgToCamera(iic1, esp32s3::BleModule::getUserId(), ssid, password);
-  }
+  // {
+  //   esp32s3::Camera_IIC iic1(IIC_SDA_PIN, IIC_SCL_PIN, IIC_FREQUENCY,
+  //                            CAMERA_IIC_ADDRESS);
+  //   sendMsgToCamera(iic1, esp32s3::BleModule::getUserId(), ssid, password);
+  // }
 
   bool cameraInitOk = cameraInit(false);
   if (cameraInitOk)

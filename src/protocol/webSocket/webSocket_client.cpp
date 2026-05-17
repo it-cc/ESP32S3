@@ -33,7 +33,7 @@ WebsocketClient::WebsocketClient(const char* webSocket_host,
           vTaskDelay(pdMS_TO_TICKS(1));
         }
       },
-      "WebsocketClientTask", 8192, this, 1, nullptr);
+      "WebsocketClientTask", 8192, this, 15, nullptr);
 }
 
 void WebsocketClient::webSocketEvent(WStype_t type, uint8_t* payload,
@@ -63,9 +63,11 @@ void WebsocketClient::run()
   if (webSocket_.isConnected())
   {
     int userId = esp32s3::BleModule::getUserId();
-    if (!initialized_)
+    static uint32_t last_txt_send = 0;
+    if (!initialized_ || millis() - last_txt_send >= 10000)
     {
       initialized_ = true;
+      last_txt_send = millis();
       char payload[64];
       snprintf(payload, sizeof(payload),
                "{\"authorization\":%d,\"position\":\"0\"}", userId);
@@ -85,7 +87,12 @@ void WebsocketClient::run()
   }
   else
   {
-    Serial.println("Websocket not connected");
+    static uint32_t last_print = 0;
+    if (millis() - last_print >= 1000)
+    {
+      last_print = millis();
+      Serial.println("Websocket not connected");
+    }
   }
 }
 

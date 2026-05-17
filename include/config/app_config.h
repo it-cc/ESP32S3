@@ -5,8 +5,8 @@
 
 namespace esp32camera
 {
-static const String WifiSsid = "Redmi";
-static const String WifiPassword = "88889999";
+static const String WifiSsid = "桂花糕";
+static const String WifiPassword = "asdfghjkl";
 static const String serverURL = "http://8.134.80.198:8899/ai/camera";
 static const String headValue = "1";
 static const String queryKey = "position";
