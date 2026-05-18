@@ -15,7 +15,7 @@
 #endif
 
 #ifndef ULTRASONIC_TRIG_PIN1
-#define ULTRASONIC_TRIG_PIN1 0
+#define ULTRASONIC_TRIG_PIN1 48
 #endif
 
 #ifndef ULTRASONIC_ECHO_PIN1

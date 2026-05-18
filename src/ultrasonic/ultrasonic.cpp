@@ -7,8 +7,8 @@ namespace esp32s3
 static uint8_t s_trigPin0= 1;
 static uint8_t s_echoPin0 = 2;
 
-static uint8_t s_trigPin1= 3;
-static uint8_t s_echoPin1 =6;
+static uint8_t s_trigPin1= ULTRASONIC_TRIG_PIN1;
+static uint8_t s_echoPin1 = ULTRASONIC_ECHO_PIN1;
 
 static volatile float s_latestDistanceMm0 = -1.0f;
 static volatile float s_latestDistanceMm1 = -1.0f;
@@ -117,7 +117,7 @@ float UltrasonicModule::measureDistanceMm0()
   float distanceMm = (durationUs * 0.3432f) / 2.0f;
   if (distanceMm < 30.0f)
   {
-    distanceMm = 0.0f;
+    return -1.0f;
   }
   else if (distanceMm > 3800.0f)
   {
@@ -143,7 +143,7 @@ float UltrasonicModule::measureDistanceMm1()
   float distanceMm = (durationUs * 0.3432f) / 2.0f;
   if (distanceMm < 30.0f)
   {
-    distanceMm = 0.0f;
+    return -1.0f;
   }
   else if (distanceMm > 3800.0f)
   {
@@ -163,11 +163,15 @@ void UltrasonicModule::task(void* pvParameters)
   {
     float distanceMm0 = measureDistanceMm0();
     s_latestDistanceMm0 = distanceMm0;
+
+    // 两个超声波之间加延时，避免串扰
+    delay(30);
+
     float distanceMm1 = measureDistanceMm1();
     s_latestDistanceMm1 = distanceMm1;
+
     Serial.println("[Ultrasonic] distance0: " + String(distanceMm0) + " mm, distance1: " + String(distanceMm1) + " mm");
     Serial.println("[Ultrasonic] ----------");
-    vTaskDelay(5000);
 
     if (distanceMm0 < 0)
     {

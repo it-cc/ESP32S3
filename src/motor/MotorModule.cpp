@@ -12,7 +12,11 @@ namespace esp32s3
 #define MOTOR_PIN_3 41
 #define MOTOR_PIN_4 42
 #define MOTOR_PIN_5 45
-#define MOTOR_PIN_6 48
+
+// 5个马达在腰带上的固定角度（0°为正前方，顺时针为正）
+static const int MOTOR_ANGLES[5] = {36, 108, 180, 252, 324};
+static const int MOTOR_PINS[5] = {MOTOR_PIN_1, MOTOR_PIN_2, MOTOR_PIN_3,
+                                  MOTOR_PIN_4, MOTOR_PIN_5};
 
 typedef enum
 {
@@ -27,141 +31,188 @@ typedef struct
 } MotorCommand;
 
 QueueHandle_t motorCmdQueue = NULL;
-bool motorRunning = false;
-int motorTargetAngle = 0;
+bool navRunning = false;    // 导航震动是否激活
+bool obsRunning = false;    // 避障震动是否激活
+int navTargetAngle = 0;
 bool s_motorInitialized = false;
 
-void calculateMotors(int angle, bool* m1, bool* m2, bool* m3, bool* m4, bool* m5, bool* m6)
+/**
+ * @brief 找到离目标角度最近的那个马达索引
+ * @param angle 目标角度 (0~360)
+ * @return 马达索引 0~4
+ */
+int findNearestMotor(int angle)
 {
-  *m1 = (angle >= -60 && angle <= 60);
-  *m2 = (angle >= 30 && angle <= 150);
-  *m3 = (angle >= -120 && angle <= 120);
-  *m4 = (angle >= -150 && angle <= -30);
-  *m5 = (angle >= 60 && angle <= 180);
-  *m6 = (angle >= -180 && angle <= -60);
+  // 规范化到 [0, 360)
+  angle = (angle % 360 + 360) % 360;
 
-  LOG_PRINTF(
-      LOG_MOTOR,
-      "[Motor] 角度: %d | 马达1: %s | 马达2: %s | 马达3: %s | 马达4: %s | 马达5: %s | 马达6: %s\n",
-      angle, *m1 ? "ON" : "OFF", *m2 ? "ON" : "OFF", *m3 ? "ON" : "OFF",
-      *m4 ? "ON" : "OFF", *m5 ? "ON" : "OFF", *m6 ? "ON" : "OFF");
+  int bestIdx = 0;
+  int bestDist = 360;
+
+  for (int i = 0; i < 5; i++)
+  {
+    int diff = abs(angle - MOTOR_ANGLES[i]);
+    if (diff > 180)
+    {
+      diff = 360 - diff;
+    }
+    if (diff < bestDist)
+    {
+      bestDist = diff;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
 }
 
-void setMotors(bool m1, bool m2, bool m3, bool m4, bool m5, bool m6)
+/**
+ * @brief 设置单个马达的开关状态
+ */
+void setMotor(int index, bool on)
 {
-  digitalWrite(MOTOR_PIN_1, m1 ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN_2, m2 ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN_3, m3 ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN_4, m4 ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN_5, m5 ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN_6, m6 ? HIGH : LOW);
+  if (index < 0 || index >= 5) return;
+  digitalWrite(MOTOR_PINS[index], on ? HIGH : LOW);
+}
+
+/**
+ * @brief 根据布尔数组设置5个马达状态
+ */
+void setMotors(bool m[5])
+{
+  for (int i = 0; i < 5; i++)
+  {
+    digitalWrite(MOTOR_PINS[i], m[i] ? HIGH : LOW);
+  }
 }
 
 void stopAllMotors()
 {
-  setMotors(false, false, false, false, false, false);
+  bool off[5] = {false, false, false, false, false};
+  setMotors(off);
   LOG_PRINTLN(LOG_MOTOR, "[Motor] 所有马达已停止");
 }
 
 void initMotorPins()
 {
-  pinMode(MOTOR_PIN_1, OUTPUT);
-  pinMode(MOTOR_PIN_2, OUTPUT);
-  pinMode(MOTOR_PIN_3, OUTPUT);
-  pinMode(MOTOR_PIN_4, OUTPUT);
-  pinMode(MOTOR_PIN_5, OUTPUT);
-  pinMode(MOTOR_PIN_6, OUTPUT);
+  for (int i = 0; i < 5; i++)
+  {
+    pinMode(MOTOR_PINS[i], OUTPUT);
+  }
   stopAllMotors();
-  LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达引脚初始化完成");
+  LOG_PRINTLN(LOG_MOTOR, "[Motor] 5个马达引脚初始化完成");
 }
 
 void motorTask(void* pvParameters)
 {
   MotorCommand motorCmd;
-  bool motorState0 = false;//导航马达
-  bool motorState1 = false;//超声波马达
-  unsigned long motorLastToggle0 = 0;//导航马达
-  unsigned long motorLastToggle1= 0;//超声波马达
-  bool currentM1 = false;
-  bool currentM2 = false;
-  bool currentM3 = false;
-  bool currentM4 = false;
-  bool currentM5 = false;
-  bool currentM6 = false;
+
+  // 导航震动独立状态
+  bool navState = false;          // 当前1s周期内的开关状态
+  unsigned long navLastToggle = 0;
+  int navMotorIdx = -1;           // 当前导航激活的马达索引
+
+  // 避障震动独立状态（两个超声波各自独立消抖）
+  unsigned long obsLastTrigM1Time = 0;  // 超声波0最后一次触发时间
+  unsigned long obsLastTrigM5Time = 0;  // 超声波1最后一次触发时间
 
   LOG_PRINTLN(LOG_MOTOR, "[Motor Task] 任务已启动, 运行在 Core 0");
 
   while (true)
   {
+    // ── 处理命令队列 ──
     if (xQueueReceive(motorCmdQueue, &motorCmd, 0) == pdPASS)
     {
       if (motorCmd.cmd == MOTOR_CMD_START)
       {
-        motorRunning = true;
-        motorTargetAngle = motorCmd.angle;
-        motorState0 = true;
-        motorLastToggle0 = millis();
+        navRunning = true;
+        navTargetAngle = motorCmd.angle;
+        navMotorIdx = findNearestMotor(navTargetAngle);
+        navState = true;
+        navLastToggle = millis();
 
-        calculateMotors(motorTargetAngle, &currentM1, &currentM2, &currentM3,
-                        &currentM4, &currentM5, &currentM6);
-        setMotors(currentM1, currentM2, currentM3, currentM4, currentM5, currentM6);
-
-        LOG_PRINTF(LOG_MOTOR, "[Motor] 开始振动, 目标角度: %d\n",
-                   motorTargetAngle);
+        LOG_PRINTF(LOG_MOTOR,
+                   "[Motor] 导航开始 | 角度: %d | 最近马达: M%d (位置%d°)\n",
+                   navTargetAngle, navMotorIdx + 1,
+                   MOTOR_ANGLES[navMotorIdx]);
       }
       else if (motorCmd.cmd == MOTOR_CMD_STOP)
       {
-        motorRunning = false;
-        stopAllMotors();
-        LOG_PRINTLN(LOG_MOTOR, "[Motor] 停止振动");
+        navRunning = false;
+        navMotorIdx = -1;
+        LOG_PRINTLN(LOG_MOTOR, "[Motor] 导航震动停止");
       }
     }
 
-    if (motorRunning)
+    // ── 导航震动：震1秒停1秒 ──
+    if (navRunning)
     {
       unsigned long now = millis();
-      if (now - motorLastToggle0 >= 1000)
+      if (now - navLastToggle >= 1000)
       {
-        motorState0 = !motorState0;
-        motorLastToggle0 = now;
+        navState = !navState;
+        navLastToggle = now;
 
-        if (motorState0)
+        if (navState)
         {
-          calculateMotors(motorTargetAngle, &currentM1, &currentM2, &currentM3,
-                          &currentM4, &currentM5, &currentM6);
-          setMotors(currentM1, currentM2, currentM3, currentM4, currentM5, currentM6);
-          LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达开启");
+          navMotorIdx = findNearestMotor(navTargetAngle);
+          LOG_PRINTF(LOG_MOTOR, "[Motor] 导航震动 ON -> M%d\n",
+                     navMotorIdx + 1);
         }
         else
         {
-          stopAllMotors();
-          LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达关闭");
+          LOG_PRINTLN(LOG_MOTOR, "[Motor] 导航震动 OFF");
         }
       }
-      if (now - motorLastToggle1 >= 500)
-      {
-        motorState1 = !motorState1;
-        motorLastToggle1 = now;
+    }
 
-        if (motorState1)
-        {
-           if(UltrasonicModule::getLatestDistanceMm0() < 100)
-           {
-             LOG_PRINTLN(LOG_ULTRASONIC, "[Ultrasonic] 检测到左前方障碍物, 开始震动");
-             setMotors(1, 1, 0, 0, 0, 0);
-           }
-           if(UltrasonicModule::getLatestDistanceMm1() < 100)
-           {
-            LOG_PRINTLN(LOG_ULTRASONIC, "[Ultrasonic] 检测到右前方障碍物, 开始震动");
-             setMotors(1, 0, 0, 1, 0, 0);
-           }
-        }
-        else
-        {
-          stopAllMotors();
-          LOG_PRINTLN(LOG_MOTOR, "[Motor] 马达关闭");
-        }
+    // ── 避障检测：两个超声波各自独立消抖，互不干扰 ──
+    {
+      unsigned long now = millis();
+      float dist0 = UltrasonicModule::getLatestDistanceMm0();
+      float dist1 = UltrasonicModule::getLatestDistanceMm1();
+      bool trigObsM1 = (dist0 > 0.0f && dist0 < 1000.0f);
+      bool trigObsM5 = (dist1 > 0.0f && dist1 < 1000.0f);
+
+      // 超声波0 → M1：有障碍立即刷新，无障碍等1秒消抖再关闭
+      if (trigObsM1)
+      {
+        obsLastTrigM1Time = now;
+        LOG_PRINTF(LOG_ULTRASONIC,
+                   "[Ultrasonic] 超声波0 %.1fmm < 1m → M1 避障震动\n",
+                   (double)dist0);
       }
+      bool obsM1Active = (now - obsLastTrigM1Time < 1000);
+
+      // 超声波1 → M5：有障碍立即刷新，无障碍等1秒消抖再关闭
+      if (trigObsM5)
+      {
+        obsLastTrigM5Time = now;
+        LOG_PRINTF(LOG_ULTRASONIC,
+                   "[Ultrasonic] 超声波1 %.1fmm < 1m → M5 避障震动\n",
+                   (double)dist1);
+      }
+      bool obsM5Active = (now - obsLastTrigM5Time < 1000);
+
+      obsRunning = (obsM1Active || obsM5Active);
+    }
+
+    // ── 综合输出：导航和避障取"或"，统一设置马达 ──
+    {
+      bool m[5];
+      for (int i = 0; i < 5; i++) m[i] = false;
+
+      // 导航需求
+      if (navRunning && navState && navMotorIdx >= 0)
+      {
+        m[navMotorIdx] = true;
+      }
+
+      // 避障需求（独立消抖：最近1秒内有障碍物就震动）
+      unsigned long now = millis();
+      if (now - obsLastTrigM1Time < 1000) m[0] = true;
+      if (now - obsLastTrigM5Time < 1000) m[4] = true;
+
+      setMotors(m);
     }
 
     vTaskDelay(pdMS_TO_TICKS(50));
